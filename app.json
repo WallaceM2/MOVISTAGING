@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "MOVI Motorista",
+    "slug": "movi-motorista",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "movi-motorista",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "br.com.movi.motorista"
+    },
+    "android": {
+      "package": "br.com.movi.motorista",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-location",
+      "expo-image-picker",
+      "@rnmapbox/maps"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "de72d7d0-e5c1-4bb2-a519-3b89b2fa5c06"
+      }
+    }
+  }
+}

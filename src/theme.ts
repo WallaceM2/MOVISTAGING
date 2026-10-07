@@ -1,0 +1,16 @@
+export const palette = {
+  ink: "#10231E",
+  inkSoft: "#334640",
+  forest: "#147A56",
+  forestDark: "#0B6242",
+  mint: "#DDF5E9",
+  lime: "#C8F169",
+  canvas: "#F4F7F5",
+  paper: "#FFFFFF",
+  line: "#E2EAE5",
+  muted: "#77847E",
+  red: "#C3423F",
+  amber: "#9A6715",
+  amberBg: "#FFF3D7",
+  shadow: "#143D2F",
+};
