@@ -13,7 +13,7 @@ export function rideStatusCopy(status: RideStatus) {
 }
 
 export function canCancelRide(status: RideStatus): boolean {
-  return status === 'solicitada' || status === 'aceita' || status === 'em_andamento';
+  return status === 'solicitada' || status === 'aceita';
 }
 
 export function isTerminalRide(status: RideStatus): boolean {

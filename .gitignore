@@ -1,4 +1,5 @@
 node_modules
+.codex-build-recovery/
 .expo
 .env
 .env.*

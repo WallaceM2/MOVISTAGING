@@ -27,6 +27,7 @@
     "expo-device": "57.0.2",
     "expo-image-picker": "57.0.20",
     "expo-linking": "57.0.11",
+    "expo-modules-core": "~57.0.20",
     "expo-location": "57.0.20",
     "expo-notifications": "57.0.21",
     "expo-task-manager": "~57.0.21",
