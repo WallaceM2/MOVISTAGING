@@ -22,7 +22,9 @@ export function getSocket() {
   if (!socket) {
     socket = io(API_URL, {
       autoConnect: false,
-      transports: ["websocket", "polling"],
+      // Polling avoids a React Native Android WebSocket failure; Socket.IO can
+      // upgrade the connection to WebSocket once the initial session is stable.
+      transports: ["polling", "websocket"],
       auth: { token },
       reconnection: true,
       reconnectionAttempts: Infinity,
