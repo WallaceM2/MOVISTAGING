@@ -117,6 +117,7 @@ test('matching GEO por categoria preserva motorista disponÃ­vel e repopula posiÃ
 
   const geo = new Map();
   const keys = new Map();
+  const poolQueries = [];
   const fakeRedis = {
     isReady: true,
     async geoAdd(key, item) {
@@ -150,7 +151,8 @@ test('matching GEO por categoria preserva motorista disponÃ­vel e repopula posiÃ
   };
 
   const fakePool = {
-    async query() {
+    async query(sql) {
+      poolQueries.push(sql);
       return {
         rows: [{
           id: 1,
@@ -178,6 +180,10 @@ test('matching GEO por categoria preserva motorista disponÃ­vel e repopula posiÃ
 
     const result = await dinamica.buscarMotoristasProximos(-8.28, -35.97, 5, 'moto');
     assert.deepEqual(result, [{ motoristaId: 1, distanciaKm: 0 }]);
+
+    await dinamica.renovarPresencaMotorista(1, true);
+    assert.ok(poolQueries.some((sql) => /SET ultima_atividade_em = NOW\(\)/.test(sql)));
+    assert.ok(poolQueries.some((sql) => /ultima_atividade_em IS NULL OR ultima_atividade_em < NOW\(\)/.test(sql)));
 
     await dinamica.marcarMotoristaDisponivel(1, false);
     assert.equal(keys.has('availability:motorista:1'), false);

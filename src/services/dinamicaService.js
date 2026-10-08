@@ -200,6 +200,18 @@ async function renovarPresencaMotorista(motoristaId,manterDisponivel = false,) {
     return false;
   }
 
+  // Keep the database activity guard in sync with a live, available socket.
+  // Throttle writes so frequent heartbeats do not cause one UPDATE per ping.
+  const activityRefreshMs = Math.max(15_000, Math.floor(ttl * 500));
+  await pool.query(`
+    UPDATE motoristas
+    SET ultima_atividade_em = NOW(), atualizado_em = NOW()
+    WHERE id = $1
+      AND online = TRUE
+      AND disponivel = TRUE
+      AND (ultima_atividade_em IS NULL OR ultima_atividade_em < NOW() - ($2 * INTERVAL '1 millisecond'));
+  `, [motoristaId, activityRefreshMs]);
+
   if (!isValidCoordinate(motorista.ultima_lat,motorista.ultima_lng,)) {
     return true;
   }
