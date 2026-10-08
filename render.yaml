@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: movi-api
+    runtime: node
+    plan: 1c-2g
+    region: ohio
+    buildCommand: npm ci
+    preDeployCommand: npm run migrate
+    startCommand: npm start
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVICE_KIND
+        value: web
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: RUN_OFFER_WORKER
+        value: false
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATIONS_DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MAPBOX_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: movi-private
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PAYMENT_PROVIDER
+        value: none
+      - key: MINIMUM_AGE
+        value: 18
+
+  - type: worker
+    name: movi-worker
+    runtime: node
+    plan: 1c-2g
+    region: ohio
+    buildCommand: npm ci
+    startCommand: npm run worker
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVICE_KIND
+        value: worker
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: RUN_OFFER_WORKER
+        value: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false

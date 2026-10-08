@@ -1,0 +1,10 @@
+const express = require('express');
+const router = express.Router();
+const controller = require('../controllers/denunciaController');
+const { verificarToken, permitirTipo } = require('../middlewares/autenticacao');
+const validar = require('../middlewares/validar');
+const asyncHandler = require('../middlewares/asyncHandler');
+const { denunciaSchema } = require('../validators/denunciaValidator');
+const idempotency = require('../middlewares/idempotency');
+router.post('/denuncias', verificarToken, permitirTipo('motorista', 'passageiro'), validar(denunciaSchema), idempotency(), asyncHandler(controller.criarDenuncia));
+module.exports = router;

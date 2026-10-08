@@ -1,0 +1,46 @@
+{
+  "name": "movi-backend",
+  "version": "2.0.0",
+  "description": "Backend do Movi - plataforma de transporte privado individual",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "migrate": "node scripts/migrate.js",
+    "test": "node --test",
+    "check": "node scripts/check.js",
+    "worker": "node src/worker.js",
+    "db:check": "node scripts/dbCheck.js",
+    "security:check": "node scripts/securityCheck.js",
+    "test:all": "npm test && npm run check && npm run security:check"
+  },
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "keywords": [
+    "movi",
+    "mobility",
+    "express",
+    "postgres",
+    "socket.io"
+  ],
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.1",
+    "multer": "^2.4.0",
+    "pg": "^8.23.0",
+    "redis": "^6.2.1",
+    "socket.io": "^4.8.3",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
