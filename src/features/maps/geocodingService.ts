@@ -7,7 +7,8 @@ export async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
   const url = new URL('https://api.mapbox.com/search/geocode/v6/forward');
   url.searchParams.set('q', query.trim()); url.searchParams.set('access_token', MAPBOX_TOKEN); url.searchParams.set('limit', '6'); url.searchParams.set('language', 'pt-BR'); url.searchParams.set('country', 'BR');
   const response = await fetch(url.toString());
-  if (!response.ok) throw new Error('Não foi possível buscar este endereço.');
+  if (response.status === 401 || response.status === 403) throw new Error('A busca de endereços foi recusada pelo serviço de mapas. Confira o token público configurado no app.');
+  if (!response.ok) throw new Error('Não foi possível buscar este endereço. Tente novamente.');
   const body = await response.json() as { features?: Array<{ id?: string; geometry?: { coordinates?: [number, number] }; properties?: { full_address?: string; name?: string; place_formatted?: string } }> };
   return (body.features ?? []).flatMap((feature, index) => {
     const coordinates = feature.geometry?.coordinates;

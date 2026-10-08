@@ -7,11 +7,11 @@ import { Card } from '@/components/Card';
 import { MapViewCard } from '@/components/MapViewCard';
 import { Screen } from '@/components/Screen';
 import { getRide, cancelRide, createRideShare, revokeRideShare } from '@/features/corrida/corridaService';
-import { canCancelRide, rideStatusCopy } from '@/features/corrida/rideState';
+import { canCancelRide, isTerminalRide, rideStatusCopy } from '@/features/corrida/rideState';
 import { subscribeRideEvents } from '@/realtime/socket';
 import { queryClient } from '@/providers';
 import { brl, km, minutes } from '@/utils/format';
-import type { Coordinates, Ride } from '@/types/api';
+import type { Coordinates } from '@/types/api';
 import { colors } from '@/theme/colors';
 
 export default function RideStatusScreen() {
@@ -36,6 +36,11 @@ export default function RideStatusScreen() {
     catch (error) { Alert.alert('Não foi possível cancelar', error instanceof Error ? error.message : 'Tente novamente.'); }
   }
 
+  function returnToHome() {
+    void queryClient.invalidateQueries({ queryKey: ['extrato'] });
+    router.replace('/(app)/home');
+  }
+
   async function onShareRide() {
     Alert.alert('Compartilhar viagem?', 'Quem receber o link poderá ver o trajeto, a identificação do veículo e a localização recente do motorista até o link ser revogado ou expirar.', [
       { text: 'Agora não', style: 'cancel' },
@@ -49,11 +54,12 @@ export default function RideStatusScreen() {
   if (query.isLoading) return <Screen title="Sua corrida" loading />;
   if (query.isError || !ride) return <Screen title="Sua corrida"><Text>Não foi possível carregar esta corrida.</Text><Button title="Voltar ao início" onPress={() => router.replace('/(app)/home')} /></Screen>;
   const copy = rideStatusCopy(ride.status);
+  const terminal = isTerminalRide(ride.status);
   const origin: Coordinates = { lat: Number(ride.origem_lat), lng: Number(ride.origem_lng) };
   const destination: Coordinates = { lat: Number(ride.destino_lat), lng: Number(ride.destino_lng) };
 
-  return <Screen title="Sua corrida" scroll={false}>
-    <MapViewCard center={driverLocation ?? origin} origin={origin} destination={destination} driver={driverLocation} height={360} />
+  return <Screen title="Sua corrida" scroll={terminal ? true : false}>
+    {!terminal ? <MapViewCard center={driverLocation ?? origin} origin={origin} destination={destination} driver={driverLocation} height={360} /> : null}
     <Card>
       <Text style={styles.status}>{copy.title}</Text>
       <Text style={styles.subtitle}>{copy.description}</Text>
@@ -69,6 +75,7 @@ export default function RideStatusScreen() {
     {canCancelRide(ride.status) ? <Button title="Cancelar corrida" variant="danger" onPress={() => void onCancel()} /> : null}
     {ride.status === 'aceita' || ride.status === 'em_andamento' ? <><Button title={sharing ? 'Gerando link seguro…' : 'Compartilhar minha viagem'} variant="secondary" disabled={sharing} onPress={() => void onShareRide()} /><Button title="Revogar link compartilhado" variant="secondary" onPress={() => void revokeRideShare(ride.id).then(() => Alert.alert('Link revogado', 'O link não mostrará mais os dados da viagem.')).catch((error) => Alert.alert('Não foi possível revogar', error instanceof Error ? error.message : 'Tente novamente.'))} /></> : null}
     {ride.status === 'concluida' ? <><Button title="Avaliar motorista" onPress={() => router.push({ pathname: '/(app)/conta/avaliar', params: { id: String(ride.id), motoristaId: String(ride.motorista_id ?? '') } })} /><Button title="Relatar um problema" variant="secondary" onPress={() => router.push({ pathname: '/(app)/conta/denunciar', params: { id: String(ride.id), motoristaId: String(ride.motorista_id ?? '') } })} /></> : null}
+    {terminal ? <Button title="Voltar para início" onPress={returnToHome} /> : null}
   </Screen>;
 }
 
