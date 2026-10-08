@@ -13,7 +13,7 @@ export function getCurrentLegal() {
 export function acceptLegal(documents: Array<{ documento_tipo: string; versao: string }>) {
   return apiFetch<{ sucesso: boolean; mensagem: string }>("/api/legal/aceites", {
     method: "POST",
-    body: JSON.stringify({ documentos }),
+    body: JSON.stringify({ documentos: documents }),
     idempotencyKey: idempotencyKey("legal-accept"),
   });
 }

@@ -20,7 +20,7 @@ export function DriverMap({ coordinate, height = 260, label = "Sua região" }: {
   }
 
   return <View style={[styles.map, { height }]}>
-    <Mapbox.MapView style={StyleSheet.absoluteFillObject} styleURL={Mapbox.StyleURL.Street} logoEnabled={false} attributionEnabled>
+    <Mapbox.MapView style={StyleSheet.absoluteFill} styleURL={Mapbox.StyleURL.Street} logoEnabled={false} attributionEnabled>
       <Mapbox.Camera centerCoordinate={[coordinate.lng, coordinate.lat]} zoomLevel={14} animationMode="flyTo" animationDuration={500} />
       <Mapbox.MarkerView id="driver-current-location" coordinate={[coordinate.lng, coordinate.lat]}>
         <View style={styles.marker}><View style={styles.markerCore} /></View>

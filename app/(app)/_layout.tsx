@@ -25,7 +25,6 @@ export default function DriverLayout() {
     <Tabs.Screen name="corrida" options={{ href: null }} />
     <Tabs.Screen name="denunciar" options={{ href: null }} />
     <Tabs.Screen name="documentos" options={{ href: null }} />
-    <Tabs.Screen name="legal" options={{ href: null }} />
     <Tabs.Screen name="alterar-senha" options={{ href: null }} />
   </Tabs>;
 }

@@ -14,7 +14,7 @@ import { stopBackgroundLocation } from "@/location/backgroundLocation";
 
 const links = [
   { route: "/(app)/documentos", icon: "file-document-outline", title: "Documentos", detail: "Identidade, habilitação e veículo" },
-  { route: "/(app)/legal", icon: "shield-check-outline", title: "Termos e privacidade", detail: "Documentos oficiais do MOVI" },
+  { route: "/legal", icon: "shield-check-outline", title: "Termos e privacidade", detail: "Documentos oficiais do MOVI" },
   { route: "/(app)/alterar-senha", icon: "lock-reset", title: "Alterar senha", detail: "Atualize sua credencial de acesso" },
 ] as const;
 
