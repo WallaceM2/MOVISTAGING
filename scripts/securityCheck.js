@@ -48,6 +48,9 @@ const authSource = fs.readFileSync(path.join(src, 'services/authService.js'), 'u
 const migrationSource = fs.readFileSync(path.join(root, 'migrations', '006_driver_document_reverification.sql'), 'utf8');
 const boardingMigration = fs.readFileSync(path.join(root, 'migrations', '007_secure_boarding_code.sql'), 'utf8');
 const safetyMigration = fs.readFileSync(path.join(root, 'migrations', '008_push_and_trip_sharing.sql'), 'utf8');
+const supportMigration = fs.readFileSync(path.join(root, 'migrations', '009_support_center.sql'), 'utf8');
+const supportRoutes = fs.readFileSync(path.join(root, 'src/routes/supportRoutes.js'), 'utf8');
+const adminRoutes = fs.readFileSync(path.join(root, 'src/routes/adminRoutes.js'), 'utf8');
 if (!serverSource.includes("app.disable('x-powered-by')")) fail('x-powered-by não está desabilitado');
 if (!serverSource.includes("httpServer.requestTimeout")) fail('request timeout não configurado');
 if (!authSource.includes("algorithms: ['HS256']")) fail('algoritmo JWT não está fixado explicitamente');
@@ -55,6 +58,9 @@ if (!migrationSource.includes('cnh_verificada_em := NULL')) fail('revalidação 
 if (!migrationSource.includes('veiculo_verificado_em := NULL')) fail('revalidação de veículo não está protegida na migration 006');
 if (!boardingMigration.includes('codigo_embarque_tentativas') || !boardingMigration.includes('codigo_embarque_bloqueado_ate')) fail('limite e bloqueio de tentativas do código de embarque ausentes na migration 007');
 if (!safetyMigration.includes('token_hash CHAR(64)') || !safetyMigration.includes('expo_push_token VARCHAR(255) NOT NULL UNIQUE')) fail('compartilhamento seguro ou armazenamento de push não está protegido na migration 008');
+if (!supportMigration.includes('solicitante_tipo') || !supportMigration.includes('autor_id IS NOT NULL AND autor_id > 0')) fail('autoria do chamado/mensagem não está limitada na migration 009');
+if (!supportRoutes.includes("permitirTipo('motorista', 'passageiro')") || supportRoutes.includes('exigirContaAtiva')) fail('acesso próprio ao suporte ou acesso de contas restritas não está preservado');
+if (!adminRoutes.includes("'/admin/suporte/chamados'") || !adminRoutes.includes('...adminOnly')) fail('fila de suporte não está protegida por autenticação administrativa');
 
 if (failures) process.exit(1);
 console.log('Security foundation checks: OK');

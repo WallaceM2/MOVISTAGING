@@ -12,11 +12,11 @@ O fluxo de aceite esperado é: passageiro solicita em dinheiro → motorista rec
 
 | Pasta | Branch / commit observado | Estado inicial |
 |---|---|---|
-| MOVI PSG | `passageiro` / `1ba7d1a` | Limpo e alinhado com origin |
-| MOVI MTA | `motorista` / `0ad0fb8` | Limpo e alinhado com origin |
-| MOVI V3 | `backend` / `6796185` | Já tinha alterações locais do usuário em `package.json` e `tests/unit.test.js`; preservar |
+| MOVI PSG | `passageiro` / `d4d1d3a` | Commit de recuperação de status/localização enviado a origin |
+| MOVI MTA | `motorista` / `d15f2da` | Ganhos móveis e atualização de ofertas enviados a origin |
+| MOVI V3 | `backend` / `a77a2b0` | Finalização financeira em dinheiro enviada a origin; implementação de suporte em andamento |
 
-O PostgreSQL configurado foi consultado sem escrita: `db:check` retornou `ok: true`, 9 migrations aplicadas e nenhum problema. Os arquivos são `000` a `008`.
+O PostgreSQL de desenvolvimento configurado agora tem 10 migrations (`000` a `009`); `db:check` retornou `ok: true`, sem problemas.
 
 ## Trabalho feito nesta sessão
 
@@ -43,6 +43,11 @@ O PostgreSQL configurado foi consultado sem escrita: `db:check` retornou `ok: tr
 - V3: `npm audit --omit=dev` foi confirmado novamente com zero vulnerabilidades.
 - Backend local respondeu `/health` com API, PostgreSQL e Redis `UP` durante o E2E.
 - Corrida sintética #13 concluiu: total R$ 5,50; recebido R$ 5,50; ganho do motorista R$ 4,67; comissão R$ 0,83. Banco confirmou `concluida`/`pago`, ledger com corrida bruta +R$ 5,50, repasse -R$ 4,67 e comissão -R$ 0,83, carteira -R$ 0,83 e ganhos móveis +R$ 4,67 em uma corrida nas últimas 24 horas. A tela MTA mostrou os ganhos e a carteira separados.
+- PSG, MTA e V3: commits `d4d1d3a`, `d15f2da` e `a77a2b0` foram enviados para as branches `passageiro`, `motorista` e `backend` do GitHub.
+- V3: primeira versão da central de suporte implementada com FAQ/triagem determinística, chamados e mensagens, fila administrativa, controle de acesso por participante, auditoria sem texto da conversa e estimativa de primeira resposta humana em 24–48 horas corridas.
+- V3: migration `009_support_center.sql` aplicada ao banco de desenvolvimento. `db:check` retornou 10 migrations, `ok: true`.
+- V3: migration runner normaliza CRLF para LF antes de calcular checksums, evitando divergência entre Windows e Unix sem enfraquecer a validação de mudanças reais nos arquivos.
+- V3: testes do suporte cobrem prioridade de segurança, validação, criação transacional e isolamento de chamados; `npm run test:all` passou com 23 testes, análise sintática e security check antes da alteração de portabilidade; repetir após mudanças finais.
 
 ## Pendências e bloqueios
 
@@ -54,10 +59,11 @@ O PostgreSQL configurado foi consultado sem escrita: `db:check` retornou `ok: tr
 
 ## Próxima sequência
 
-1. Depois do E2E de dinheiro integral, validar corrida parcialmente paga/não paga e os limites de carteira com regras de produto definidas.
-2. Tratar os alertas de dependências com atualização compatível, validando novamente bundles, typecheck, testes e APKs.
-3. Confirmar requisito de expiração móvel das 24 horas em cenário controlado por teste (sem manipular relógio/dados de operação).
-4. Só declarar pronto para operação após revisão de segurança, requisitos legais/operacionais e estratégia de observabilidade/suporte.
+1. Integrar os endpoints de suporte nos apps e criar uma fila/painel para atendimento humano; definir operação real para cumprir a estimativa de 24–48 horas.
+2. Validar corrida parcialmente paga/não paga e os limites de carteira com regras de produto definidas.
+3. Tratar alertas de dependências nas pastas PSG e MTA com atualização compatível, validando bundles, typecheck, testes e APKs.
+4. Confirmar requisito de expiração móvel das 24 horas em cenário controlado por teste.
+5. Só declarar pronto para operação após revisão de segurança, requisitos legais/operacionais e estratégia de observabilidade.
 
 ## Privacidade
 

@@ -62,7 +62,8 @@ async function main() {
 
       const checksum = crypto
         .createHash('sha256')
-        .update(sql)
+        // Keep checksums stable across Windows (CRLF) and Unix (LF) checkouts.
+        .update(sql.replace(/\r\n/g, '\n'))
         .digest('hex');
 
       const exists = await client.query(

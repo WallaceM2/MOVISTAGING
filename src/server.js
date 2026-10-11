@@ -32,6 +32,7 @@ const authRoutes = require('./routes/authRoutes');
 const legalRoutes = require('./routes/legalRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const tripShareRoutes = require('./routes/tripShareRoutes');
+const supportRoutes = require('./routes/supportRoutes');
 const { AppError } = require('./errors');
 
 const app = express();
@@ -112,6 +113,7 @@ app.use('/api', authRoutes);
 app.use('/api', legalRoutes);
 app.use('/api', pushRoutes);
 app.use('/api', tripShareRoutes);
+app.use('/api', supportRoutes);
 app.use('/', tripShareRoutes);
 app.use('/api', motoristaRoutes);
 app.use('/api', passageiroRoutes);

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const supportController = require('../controllers/supportController');
 const verificarToken = require('../middlewares/autenticacao');
 const { permitirTipo, exigirContaAtiva } = require('../middlewares/autenticacao');
 const { limiteAuth } = require('../middlewares/rateLimiter');
@@ -9,6 +10,8 @@ const asyncHandler = require('../middlewares/asyncHandler');
 const { loginSchema, statusMotoristaSchema, statusPassageiroSchema, verificarMotoristaSchema } = require('../validators/adminValidator');
 const { validarParams } = validar;
 const { z } = require('zod');
+const idempotency = require('../middlewares/idempotency');
+const { messageSchema, updateStatusSchema } = require('../validators/supportValidator');
 const idSchema = z.object({ id: z.coerce.number().int().positive() });
 
 const adminOnly = [verificarToken, permitirTipo('admin'), exigirContaAtiva];
@@ -20,5 +23,9 @@ router.patch('/admin/motoristas/:id/verificacao', ...adminOnly, validarParams(id
 router.patch('/admin/motoristas/:id/status', ...adminOnly, validarParams(idSchema), validar(statusMotoristaSchema), asyncHandler(adminController.atualizarStatusMotorista));
 router.get('/admin/passageiros/:id', ...adminOnly, validarParams(idSchema), asyncHandler(adminController.verPassageiro));
 router.patch('/admin/passageiros/:id/status', ...adminOnly, validarParams(idSchema), validar(statusPassageiroSchema), asyncHandler(adminController.atualizarStatusPassageiro));
+router.get('/admin/suporte/chamados', ...adminOnly, asyncHandler(supportController.listAdminTickets));
+router.get('/admin/suporte/chamados/:id', ...adminOnly, validarParams(idSchema), asyncHandler(supportController.getAdminTicket));
+router.post('/admin/suporte/chamados/:id/mensagens', ...adminOnly, validarParams(idSchema), validar(messageSchema), idempotency(), asyncHandler(supportController.addAdminMessage));
+router.patch('/admin/suporte/chamados/:id/status', ...adminOnly, validarParams(idSchema), validar(updateStatusSchema), asyncHandler(supportController.updateAdminStatus));
 
 module.exports = router;

@@ -7,7 +7,7 @@ const requiredTables = [
   'movi_audit_logs', 'movi_areas_operacao', 'movi_tarifas', 'movi_pagamentos', 'movi_contatos_confianca',
   'movi_eventos_seguranca', 'movi_veiculos', 'movi_aceites_termos', 'movi_solicitacoes_titular',
   'movi_incidentes_seguranca', 'movi_lancamentos_financeiros', 'movi_saques_motoristas', 'movi_push_dispositivos',
-  'movi_push_recibos', 'movi_compartilhamentos_corrida', 'movi_schema_migrations',
+  'movi_push_recibos', 'movi_compartilhamentos_corrida', 'movi_suporte_chamados', 'movi_suporte_mensagens', 'movi_schema_migrations',
 ];
 
 const requiredColumns = {

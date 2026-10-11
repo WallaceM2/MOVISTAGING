@@ -9,6 +9,8 @@ const { cadastroPassageiroSchema } = require('../src/validators/passageiroValida
 const { cadastroMotoristaSchema } = require('../src/validators/motoristaValidator');
 const { signAccessToken, createRefreshToken, hashToken } = require('../src/services/tokenService');
 const { verifyAccessToken } = require('../src/services/authService');
+const supportKnowledge = require('../src/services/supportKnowledgeService');
+const supportValidators = require('../src/validators/supportValidator');
 const crypto = require('crypto');
 
 
@@ -373,4 +375,78 @@ test('assinaturas de arquivos rejeitam conteúdo incompatível', () => {
   const fakeReq = (buffer, mimetype) => ({ file: { buffer, mimetype }, files: null });
   assert.doesNotThrow(() => upload.validarAssinaturaArquivo(fakeReq(jpeg, 'image/jpeg'), {}, () => {}));
   assert.doesNotThrow(() => upload.validarAssinaturaArquivo(fakeReq(png, 'image/png'), {}, () => {}));
+});
+
+test('triagem do suporte prioriza segurança e não afirma resolver casos automaticamente', () => {
+  const safety = supportKnowledge.triage('Sofri assédio durante a corrida e estou em perigo');
+  assert.equal(safety.categoria_sugerida, 'seguranca');
+  assert.equal(safety.sugerir_chamado, true);
+  assert.equal(safety.resolvido_pelo_bot, false);
+  assert.match(safety.resposta, /emergência/);
+
+  const payment = supportKnowledge.triage('Quero contestar o valor cobrado no pagamento');
+  assert.equal(payment.categoria_sugerida, 'pagamento');
+  assert.equal(supportKnowledge.listArticles().length >= 4, true);
+});
+
+test('chamado exige descrição mínima, categoria válida e mensagem sem excesso', () => {
+  const base = { categoria: 'corrida', assunto: 'Corrida não atualizou', mensagem: 'O status ficou parado mesmo após a viagem terminar.' };
+  assert.equal(supportValidators.createTicketSchema.safeParse(base).success, true);
+  assert.equal(supportValidators.createTicketSchema.safeParse({ ...base, mensagem: 'Ajuda' }).success, false);
+  assert.equal(supportValidators.createTicketSchema.safeParse({ ...base, categoria: 'fraude' }).success, false);
+  assert.equal(supportValidators.messageSchema.safeParse({ mensagem: '   ' }).success, false);
+  assert.equal(supportValidators.adminFilterSchema.safeParse({ status: 'aberto', limit: '25', offset: '0' }).success, true);
+});
+
+test('criação de chamado valida participante e persiste chamado e primeira mensagem na mesma transação', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const modelPath = require.resolve('../src/models/SupportTicket');
+  const originalDatabase = require.cache[databasePath];
+  const originalModel = require.cache[modelPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT passageiro_id, motorista_id FROM corridas/.test(sql)) return { rows: [{ passageiro_id: 7, motorista_id: 9 }] };
+      if (/INSERT INTO movi_suporte_chamados/.test(sql)) return { rows: [{ id: 501, categoria: 'seguranca', corrida_id: 73, status: 'aberto' }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client } };
+  delete require.cache[modelPath];
+
+  try {
+    const SupportTicket = require('../src/models/SupportTicket');
+    const ticket = await SupportTicket.create({ requesterType: 'passageiro', requesterId: 7, rideId: 73, category: 'seguranca', subject: 'Ocorrência na viagem', message: 'Preciso relatar o que aconteceu durante esta corrida.' });
+    assert.equal(ticket.id, 501);
+    assert.deepEqual(calls.find(({ sql }) => /INSERT INTO movi_suporte_mensagens/.test(sql)).values, [501, 'passageiro', 7, 'Preciso relatar o que aconteceu durante esta corrida.']);
+    assert.deepEqual(calls.find(({ sql }) => /INSERT INTO movi_suporte_chamados/.test(sql)).values, ['passageiro', 7, 73, 'seguranca', 'Ocorrência na viagem', 'alta']);
+    assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
+    assert.equal(calls.some(({ sql }) => sql === 'ROLLBACK'), false);
+  } finally {
+    if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
+});
+
+test('chamado não é encontrado quando solicitante tenta acessar ticket de outra conta', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const modelPath = require.resolve('../src/models/SupportTicket');
+  const originalDatabase = require.cache[databasePath];
+  const originalModel = require.cache[modelPath];
+  let query;
+  require.cache[databasePath] = { exports: { async query(sql, values) { query = { sql, values }; return { rows: [] }; } } };
+  delete require.cache[modelPath];
+
+  try {
+    const SupportTicket = require('../src/models/SupportTicket');
+    const ticket = await SupportTicket.getForRequester({ ticketId: 501, requesterType: 'passageiro', requesterId: 8 });
+    assert.equal(ticket, null);
+    assert.deepEqual(query.values, [501, 'passageiro', 8]);
+    assert.match(query.sql, /solicitante_tipo = \$2 AND solicitante_id = \$3/);
+  } finally {
+    if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
 });
