@@ -60,30 +60,6 @@ async function estimar(req, res) {
   res.json({ mensagem: 'Estimativa calculada com sucesso', estimativa });
 }
 
-async function emitirOferta(corrida, motorista) {
-  const oferta = await Corrida.criarOferta(corrida.id, motorista.motoristaId, motorista.distanciaKm, env.OFFER_TIMEOUT_SEC);
-  if (!oferta) return false;
-  const distancia = Number(corrida.distancia_ate_motorista_km || motorista.distanciaKm || 0);
-  await emitToUser('motorista', motorista.motoristaId, 'nova_oferta_corrida', {
-    corrida_id: corrida.id,
-    local_embarque: corrida.origem,
-    local_desembarque: corrida.destino,
-    valor_motorista: Number(corrida.ganho_motorista),
-    ganho_por_km: Number(corrida.ganho_motorista) / Math.max(Number(corrida.distancia_km || 0), 0.01),
-    distancia_km: Number(corrida.distancia_km || 0),
-    tempo_minutos: Number(corrida.tempo_minutos || 0),
-    conta_verificada: true,
-    forma_pagamento: corrida.forma_pagamento,
-    categoria: corrida.categoria,
-    coordenadas: {
-      origem: { lat: Number(corrida.origem_lat), lng: Number(corrida.origem_lng) },
-      destino: { lat: Number(corrida.destino_lat), lng: Number(corrida.destino_lng) },
-    },
-    tempo_para_aceitar: env.OFFER_TIMEOUT_SEC,
-  });
-  return true;
-}
-
 async function solicitarCorrida(req, res) {
   const { origem, destino, origem_lat, origem_lng, destino_lat, destino_lng, categoria, forma_pagamento } = req.body;
   const passageiro_id = req.usuario.id;
@@ -109,14 +85,8 @@ async function solicitarCorrida(req, res) {
     valor_base_cliente: estimativa.valorBaseCliente, valor_dinamica_cliente: estimativa.valorDinamicaCliente,
   });
 
-  const corridaComDados = {
-    ...novaCorrida,
-    distancia_km: estimativa.distanciaKm,
-    tempo_minutos: estimativa.tempoMin,
-  };
-
   const motoristas = await buscarMotoristasProximos(origem_lat, origem_lng, env.DRIVER_SEARCH_RADIUS_KM, categoria);
-  const primeiraOferta = motoristas[0] ? await emitirOferta(corridaComDados, motoristas[0]) : false;
+  const primeiraOferta = motoristas.length ? await despacharProximaOferta(novaCorrida.id) : false;
 
   await emitToUser('passageiro', passageiro_id, 'corrida_solicitada', {
     corrida_id: novaCorrida.id,

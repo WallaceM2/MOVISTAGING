@@ -7,6 +7,16 @@ const env = require('../config/env');
 const ACTIVE_STATUSES = ['solicitada', 'aceita', 'em_andamento'];
 
 const FINALIZABLE_PAYMENT_STATUSES = new Set(['pago', 'parcial', 'nao_pago']);
+const PASSENGER_DEBT_LIMIT = 10;
+const DRIVER_CASH_DEBT_LIMIT = -10;
+
+function deveBloquearNovaCorrida(debitoPendente) {
+  return Number(debitoPendente || 0) >= PASSENGER_DEBT_LIMIT;
+}
+
+function deveBloquearCorridasEmDinheiro(saldoCarteira) {
+  return Number(saldoCarteira || 0) <= DRIVER_CASH_DEBT_LIMIT;
+}
 
 function assertFinancialSnapshot({ valor, ganho_motorista, ganho_app, percentual_comissao_app, percentual_repasse_motorista }) {
   const gross = Number(valor);
@@ -23,10 +33,16 @@ function assertFinancialSnapshot({ valor, ganho_motorista, ganho_app, percentual
 }
 
 async function registrarLedgerCorrida(client, corrida, pagamentoId = null) {
+  const valorRecebido = Number(corrida.valor_recebido_motorista ?? corrida.valor);
+  const proporcaoRecebida = Number(corrida.valor) > 0 ? Math.min(1, Math.max(0, valorRecebido / Number(corrida.valor))) : 0;
+  const brutoRecebido = Number(valorRecebido.toFixed(2));
+  const repasseRecebido = Number((brutoRecebido * 0.85).toFixed(2));
+  const comissaoRecebida = Number((brutoRecebido - repasseRecebido).toFixed(2));
+  if (brutoRecebido <= 0) return;
   const entries = [
-    { tipo: 'corrida_bruta', valor: Number(corrida.valor), ref: `corrida:${corrida.id}:bruta`, metadata: { papel: 'valor_bruto', status_pagamento: corrida.status_pagamento } },
-    { tipo: 'repasse_motorista', valor: -Number(corrida.ganho_motorista), ref: `corrida:${corrida.id}:repasse`, metadata: { papel: 'repasse_motorista' } },
-    { tipo: 'comissao_app', valor: -Number(corrida.ganho_app), ref: `corrida:${corrida.id}:comissao`, metadata: { papel: 'comissao_movi' } },
+    { tipo: 'corrida_bruta', valor: brutoRecebido, ref: `corrida:${corrida.id}:bruta`, metadata: { papel: 'valor_bruto_recebido', status_pagamento: corrida.status_pagamento, valor_total_corrida: Number(corrida.valor) } },
+    { tipo: 'repasse_motorista', valor: -repasseRecebido, ref: `corrida:${corrida.id}:repasse`, metadata: { papel: 'repasse_motorista', percentual: 85, proporcao_recebida: proporcaoRecebida } },
+    { tipo: 'comissao_app', valor: -comissaoRecebida, ref: `corrida:${corrida.id}:comissao`, metadata: { papel: 'comissao_movi', percentual: 15, proporcao_recebida: proporcaoRecebida } },
   ];
 
   for (const entry of entries) {
@@ -54,8 +70,8 @@ async function criar(dados) {
     if (!p) throw new AppError('Passageiro não encontrado.', 404, 'PASSENGER_NOT_FOUND');
     if (['suspensa', 'banida', 'bloqueada'].includes(p.status_conta)) throw new AppError('Conta do passageiro indisponível.', 403, 'ACCOUNT_UNAVAILABLE');
     const debito = Number(p.debito_pendente || 0);
-    if (debito >= 10 && forma_pagamento === 'dinheiro') {
-      throw new AppError('Há um débito pendente. Para solicitar uma nova corrida, quite o débito ou utilize uma forma de pagamento digital habilitada.', 403, 'OUTSTANDING_DEBT');
+    if (deveBloquearNovaCorrida(debito)) {
+      throw new AppError('Seu débito pendente atingiu R$ 10,00. Quite o valor antes de solicitar outra corrida.', 403, 'OUTSTANDING_DEBT');
     }
 
     const active = await client.query(`
@@ -389,9 +405,10 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       const driver = driverResult.rows[0];
       if (!driver) throw new AppError('Motorista não encontrado.', 404, 'DRIVER_NOT_FOUND');
       const saldoAnterior = Number(driver.saldo_carteira || 0);
-      const ganhoApp = Number(corrida.ganho_app || 0);
+      const valorRecebido = Number(recebido || 0);
+      const ganhoApp = Number((valorRecebido * 0.15).toFixed(2));
       const saldoAtual = Number((saldoAnterior - ganhoApp).toFixed(2));
-      const bloqueado = saldoAtual <= -5;
+      const bloqueado = deveBloquearCorridasEmDinheiro(saldoAtual);
 
       await client.query(`
         UPDATE motoristas SET saldo_carteira = $1, bloqueado_dinheiro = $2, atualizado_em = NOW()
@@ -401,7 +418,7 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       const existingTx = await client.query(`
         SELECT id FROM transacoes_motoristas WHERE corrida_id = $1 AND tipo = 'debito_taxa_app' LIMIT 1;
       `, [corridaId]);
-      if (!existingTx.rows.length) {
+      if (ganhoApp > 0 && !existingTx.rows.length) {
         await client.query(`
           INSERT INTO transacoes_motoristas (motorista_id, corrida_id, tipo, valor, saldo_anterior, saldo_atual)
           VALUES ($1,$2,'debito_taxa_app',$3,$4,$5)
@@ -454,7 +471,7 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       JSON.stringify({ origem: 'corrida.finalizar', observacao: observacao_pagamento || null }),
     ]);
 
-    const finalizedRide = { ...corrida, motorista_id: motoristaId, status_pagamento: paymentStatus };
+    const finalizedRide = { ...corrida, motorista_id: motoristaId, status_pagamento: paymentStatus, valor_recebido_motorista: Number(recebido || 0) };
     await registrarLedgerCorrida(client, finalizedRide, paymentResult.rows[0]?.id || null);
 
     await client.query('COMMIT');
@@ -474,10 +491,11 @@ async function resumoParaUsuario({ tipo, id }) {
     SELECT
       COUNT(*)::int AS total_corridas,
       COUNT(*) FILTER (WHERE status = 'concluida')::int AS corridas_concluidas,
-      COALESCE(SUM(ganho_motorista) FILTER (WHERE status = 'concluida'), 0)::numeric(12,2) AS ganhos_motorista,
-      COALESCE(SUM(ganho_motorista) FILTER (
-        WHERE status = 'concluida' AND finalizada_em >= NOW() - INTERVAL '24 hours'
-      ), 0)::numeric(12,2) AS ganhos_ultimas_24h,
+      COALESCE((SELECT SUM(-l.valor) FROM movi_lancamentos_financeiros l
+        WHERE l.motorista_id = $1 AND l.tipo = 'repasse_motorista' AND l.valor < 0), 0)::numeric(12,2) AS ganhos_motorista,
+      COALESCE((SELECT SUM(-l.valor) FROM movi_lancamentos_financeiros l
+        WHERE l.motorista_id = $1 AND l.tipo = 'repasse_motorista' AND l.valor < 0
+          AND l.criado_em >= NOW() - INTERVAL '24 hours'), 0)::numeric(12,2) AS ganhos_ultimas_24h,
       COALESCE(SUM(valor) FILTER (WHERE status = 'concluida'), 0)::numeric(12,2) AS valor_total_corridas,
       CASE WHEN $2 = 'motorista' THEN (SELECT saldo_carteira FROM motoristas WHERE id = $1) ELSE NULL END AS saldo_carteira
     FROM corridas WHERE ${coluna} = $1;
@@ -488,7 +506,11 @@ async function resumoParaUsuario({ tipo, id }) {
 async function listarParaUsuario({ tipo, id, limit = 20, offset = 0 }) {
   const coluna = tipo === 'motorista' ? 'motorista_id' : 'passageiro_id';
   const { rows } = await pool.query(`
-    SELECT id, origem, destino, valor, ganho_motorista, ganho_app, forma_pagamento, status, status_pagamento,
+    SELECT id, origem, destino, valor,
+           CASE WHEN status = 'concluida' AND forma_pagamento = 'dinheiro'
+             THEN ROUND((ganho_motorista * COALESCE(valor_recebido_motorista, 0) / NULLIF(valor, 0))::numeric, 2)
+             ELSE ganho_motorista END AS ganho_motorista,
+           ganho_app, forma_pagamento, status, status_pagamento,
            valor_recebido_motorista, criado_em, aceita_em, iniciada_em, finalizada_em, cancelada_em
     FROM corridas WHERE ${coluna} = $1 ORDER BY criado_em DESC LIMIT $2 OFFSET $3;
   `, [id, limit, offset]);
@@ -498,4 +520,5 @@ async function listarParaUsuario({ tipo, id, limit = 20, offset = 0 }) {
 module.exports = {
   criar, buscarPorId, aceitar, criarOferta, listarOfertasPendentes, buscarOfertaPendente, recusarOferta,
   atualizarStatusControlado, iniciarComCodigoEmbarque, finalizarComPagamento, listarParaUsuario, resumoParaUsuario, assertFinancialSnapshot, registrarLedgerCorrida,
+  deveBloquearNovaCorrida, deveBloquearCorridasEmDinheiro,
 };

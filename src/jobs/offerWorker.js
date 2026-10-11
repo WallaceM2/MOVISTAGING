@@ -40,8 +40,18 @@ async function despacharProximaOferta(corridaId) {
       env.DRIVER_SEARCH_RADIUS_KM,
       corrida.categoria,
     );
-    const next = candidates.find((candidate) => !used.has(Number(candidate.motoristaId)));
-    if (!next) {
+    const available = candidates.filter((candidate) => !used.has(Number(candidate.motoristaId)));
+    let eligible = available;
+    if (corrida.forma_pagamento === 'dinheiro' && available.length) {
+      const driverIds = available.map(({ motoristaId }) => Number(motoristaId));
+      const blockedResult = await pool.query(`
+        SELECT id FROM motoristas
+        WHERE id = ANY($1::integer[]) AND bloqueado_dinheiro = TRUE;
+      `, [driverIds]);
+      const blocked = new Set(blockedResult.rows.map(({ id }) => Number(id)));
+      eligible = available.filter(({ motoristaId }) => !blocked.has(Number(motoristaId)));
+    }
+    if (!eligible.length) {
       const expired = await pool.query(`
         UPDATE corridas
         SET status = 'expirada', atualizado_em = NOW()
@@ -61,9 +71,10 @@ async function despacharProximaOferta(corridaId) {
       return false;
     }
 
-    const created = await Corrida.criarOferta(corrida.id, next.motoristaId, next.distanciaKm, env.OFFER_TIMEOUT_SEC);
-    if (created) {
-      await emitToUser('motorista', next.motoristaId, 'nova_oferta_corrida', {
+    for (const candidate of eligible) {
+      const created = await Corrida.criarOferta(corrida.id, candidate.motoristaId, candidate.distanciaKm, env.OFFER_TIMEOUT_SEC);
+      if (!created) continue;
+      await emitToUser('motorista', candidate.motoristaId, 'nova_oferta_corrida', {
         corrida_id: corrida.id,
         local_embarque: corrida.origem,
         local_desembarque: corrida.destino,

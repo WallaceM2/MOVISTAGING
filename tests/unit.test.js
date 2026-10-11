@@ -248,7 +248,9 @@ test('extrato separa ganhos acumulados dos ganhos concluídos nas últimas 24 ho
     const Corrida = require('../src/models/Corrida');
     const resumo = await Corrida.resumoParaUsuario({ tipo: 'motorista', id: 42 });
     assert.deepEqual(parameters, [42, 'motorista']);
-    assert.match(statement, /status = 'concluida' AND finalizada_em >= NOW\(\) - INTERVAL '24 hours'/);
+    assert.match(statement, /movi_lancamentos_financeiros l/);
+    assert.match(statement, /l\.criado_em >= NOW\(\) - INTERVAL '24 hours'/);
+    assert.match(statement, /l\.tipo = 'repasse_motorista'/);
     assert.match(statement, /AS ganhos_ultimas_24h/);
     assert.equal(resumo.ganhos_motorista, '150.00');
     assert.equal(resumo.ganhos_ultimas_24h, '30.00');
@@ -302,6 +304,60 @@ test('finalização em dinheiro registra ganho do motorista separado da taxa deb
     ]);
     assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
     assert.equal(calls.some(({ sql }) => sql === 'ROLLBACK'), false);
+  } finally {
+    if (originalCorrida) require.cache[corridaPath] = originalCorrida;
+    else delete require.cache[corridaPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase;
+    else delete require.cache[databasePath];
+  }
+});
+
+test('regras de limite financeiro bloqueiam passageiro em R$10 e dinheiro do motorista em -R$10', () => {
+  const Corrida = require('../src/models/Corrida');
+  assert.equal(Corrida.deveBloquearNovaCorrida(9.99), false);
+  assert.equal(Corrida.deveBloquearNovaCorrida(10), true);
+  assert.equal(Corrida.deveBloquearNovaCorrida(10.01), true);
+  assert.equal(Corrida.deveBloquearCorridasEmDinheiro(-9.99), false);
+  assert.equal(Corrida.deveBloquearCorridasEmDinheiro(-10), true);
+  assert.equal(Corrida.deveBloquearCorridasEmDinheiro(-10.01), true);
+});
+
+test('corrida em dinheiro parcial cobra comissão e credita ganho apenas sobre o recebido', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const corridaPath = require.resolve('../src/models/Corrida');
+  const originalDatabase = require.cache[databasePath];
+  const originalCorrida = require.cache[corridaPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT \* FROM corridas/.test(sql)) return { rows: [{
+        id: 74, passageiro_id: 9, motorista_id: 42, status: 'em_andamento', status_pagamento: 'pendente',
+        forma_pagamento: 'dinheiro', valor: '100.00', ganho_motorista: '85.00', ganho_app: '15.00',
+      }] };
+      if (/SELECT saldo_carteira, bloqueado_dinheiro/.test(sql)) return { rows: [{ saldo_carteira: '0.00', bloqueado_dinheiro: false }] };
+      if (/SELECT debito_pendente FROM passageiros/.test(sql)) return { rows: [{ debito_pendente: '0.00' }] };
+      if (/SELECT id FROM ocorrencias_pagamento/.test(sql)) return { rows: [] };
+      if (/SELECT id FROM transacoes_motoristas/.test(sql)) return { rows: [] };
+      if (/INSERT INTO movi_pagamentos/.test(sql)) return { rows: [{ id: 901 }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client } };
+  delete require.cache[corridaPath];
+  try {
+    const Corrida = require('../src/models/Corrida');
+    const result = await Corrida.finalizarComPagamento(74, 42, { status_pagamento: 'parcial', valor_recebido_motorista: 40 });
+    const walletUpdate = calls.find(({ sql }) => /UPDATE motoristas SET saldo_carteira/.test(sql));
+    const debtUpdate = calls.find(({ sql }) => /UPDATE passageiros SET debito_pendente/.test(sql));
+    const ledgerEntries = calls.filter(({ sql }) => /INSERT INTO movi_lancamentos_financeiros/.test(sql));
+    assert.equal(result.sucesso, true);
+    assert.deepEqual(walletUpdate.values, [-6, false, 42]);
+    assert.deepEqual(debtUpdate.values, [60, 9]);
+    assert.deepEqual(ledgerEntries.map(({ values }) => [values[4], values[5]]), [
+      ['corrida_bruta', 40], ['repasse_motorista', -34], ['comissao_app', -6],
+    ]);
   } finally {
     if (originalCorrida) require.cache[corridaPath] = originalCorrida;
     else delete require.cache[corridaPath];
@@ -395,6 +451,52 @@ test('matching reconstrói o GEO quando o índice está vazio mas o estado persi
     if (originalRedis) require.cache[redisPath] = originalRedis; else delete require.cache[redisPath];
     if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
     if (originalDinamica) require.cache[dinamicaPath] = originalDinamica; else delete require.cache[dinamicaPath];
+  }
+});
+
+test('despacho de corrida em dinheiro pula motorista bloqueado e oferece ao próximo elegível', async () => {
+  const paths = [
+    '../src/config/database', '../src/services/dinamicaService', '../src/services/realtimeService',
+    '../src/models/Corrida', '../src/services/pushService', '../src/jobs/offerWorker',
+  ].map((path) => require.resolve(path));
+  const originals = paths.map((path) => require.cache[path]);
+  const offered = [];
+  const emitted = [];
+  const fakeClient = {
+    async query(sql) {
+      if (/SELECT \* FROM corridas/.test(sql)) return { rows: [{ id: 80, status: 'solicitada', motorista_id: null, forma_pagamento: 'dinheiro', categoria: 'moto', origem_lat: -8.28, origem_lng: -35.97, origem: 'A', destino: 'B', ganho_motorista: '8.50', distancia_km: 2, tempo_minutos: 8 }] };
+      if (/SELECT 1 FROM corrida_ofertas/.test(sql)) return { rows: [] };
+      if (/SELECT motorista_id FROM corrida_ofertas/.test(sql)) return { rows: [] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[paths[0]] = { exports: {
+    connect: async () => fakeClient,
+    async query(sql) {
+      if (/SELECT id FROM motoristas/.test(sql)) return { rows: [{ id: 1 }] };
+      return { rows: [] };
+    },
+  } };
+  require.cache[paths[1]] = { exports: {
+    async buscarMotoristasProximos() { return [{ motoristaId: 1, distanciaKm: 0.1 }, { motoristaId: 2, distanciaKm: 0.2 }]; },
+    async limparDemandaPassageiro() {},
+  } };
+  require.cache[paths[2]] = { exports: { async emitToUser(...args) { emitted.push(args); } } };
+  require.cache[paths[3]] = { exports: { async criarOferta(...args) { offered.push(args); return { id: 1 }; } } };
+  require.cache[paths[4]] = { exports: { async checkPushReceipts() {} } };
+  delete require.cache[paths[5]];
+  try {
+    const worker = require(paths[5]);
+    assert.equal(await worker.despacharProximaOferta(80), true);
+    assert.equal(offered.length, 1);
+    assert.equal(offered[0][1], 2);
+    assert.equal(emitted[0][1], 2);
+  } finally {
+    paths.forEach((path, index) => {
+      if (originals[index]) require.cache[path] = originals[index];
+      else delete require.cache[path];
+    });
   }
 });
 
