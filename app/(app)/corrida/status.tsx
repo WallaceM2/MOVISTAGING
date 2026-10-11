@@ -7,7 +7,7 @@ import { Card } from '@/components/Card';
 import { MapViewCard } from '@/components/MapViewCard';
 import { Screen } from '@/components/Screen';
 import { getRide, cancelRide, createRideShare, revokeRideShare } from '@/features/corrida/corridaService';
-import { canCancelRide, isTerminalRide, rideStatusCopy } from '@/features/corrida/rideState';
+import { canCancelRide, isTerminalRide, rideRefetchInterval, rideStatusCopy } from '@/features/corrida/rideState';
 import { subscribeRideEvents } from '@/realtime/socket';
 import { queryClient } from '@/providers';
 import { brl, km, minutes } from '@/utils/format';
@@ -19,7 +19,7 @@ export default function RideStatusScreen() {
   const rideId = Number(id);
   const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
   const [sharing, setSharing] = useState(false);
-  const query = useQuery({ queryKey: ['ride-active', rideId], queryFn: () => getRide(rideId), enabled: Number.isInteger(rideId) && rideId > 0, refetchInterval: (q) => q.state.data?.status === 'solicitada' ? 10000 : false });
+  const query = useQuery({ queryKey: ['ride-active', rideId], queryFn: () => getRide(rideId), enabled: Number.isInteger(rideId) && rideId > 0, refetchInterval: (q) => rideRefetchInterval(q.state.data?.status) });
   const ride = query.data;
 
   useEffect(() => subscribeRideEvents({

@@ -19,3 +19,7 @@ export function canCancelRide(status: RideStatus): boolean {
 export function isTerminalRide(status: RideStatus): boolean {
   return status === 'concluida' || status === 'cancelada' || status === 'expirada';
 }
+
+export function rideRefetchInterval(status?: RideStatus): number | false {
+  return status && isTerminalRide(status) ? false : 10000;
+}

@@ -131,14 +131,14 @@ export type ExtratoResponse = {
   total_viagens: number;
   corridas_concluidas: number;
   valor_total_corridas: string;
-  historico: Array<Pick<Ride, 'id' | 'origem' | 'destino' | 'valor' | 'forma_pagamento' | 'status' | 'status_pagamento' | 'criado_em' | 'finalizada_em'>>;
+  historico: Pick<Ride, 'id' | 'origem' | 'destino' | 'valor' | 'forma_pagamento' | 'status' | 'status_pagamento' | 'criado_em' | 'finalizada_em'>[];
   pagina: { limit: number; offset: number };
 };
 
 export type EvaluationInput = { corrida_id: number; avaliado_tipo: 'motorista' | 'passageiro'; avaliado_id: number; nota: number; tag?: string; comentario?: string };
 export type ReportInput = { corrida_id: number; denunciado_id: number; motivo: 'direcao_perigosa' | 'assedio' | 'agressao' | 'roubo' | 'fraude' | 'outro'; descricao?: string };
 
-export type ApiErrorShape = {erro?: string;mensagem?: string;codigo?: string;request_id?: string;detalhes?: Array<{campo?: string;mensagem?: string;}>;};
+export type ApiErrorShape = {erro?: string;mensagem?: string;codigo?: string;request_id?: string;detalhes?: {campo?: string;mensagem?: string;}[];};
 
 export type SocketEventPayload = {
   corrida_solicitada: { corrida_id: number; status: RideStatus; oferta_enviada: boolean };

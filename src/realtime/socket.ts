@@ -46,12 +46,12 @@ export function sendHeartbeat() {
 export function subscribeRideEvents(handlers: Partial<{ [K in keyof ServerEvents]: (payload: ServerEvents[K]) => void }>) {
   const current = connectSocket();
   if (!current) return () => undefined;
-  for (const event of Object.keys(handlers) as Array<keyof ServerEvents>) {
+  for (const event of Object.keys(handlers) as (keyof ServerEvents)[]) {
     const handler = handlers[event];
     if (handler) current.on(event, handler as never);
   }
   return () => {
-    for (const event of Object.keys(handlers) as Array<keyof ServerEvents>) {
+    for (const event of Object.keys(handlers) as (keyof ServerEvents)[]) {
       const handler = handlers[event];
       if (handler) current.off(event, handler as never);
     }

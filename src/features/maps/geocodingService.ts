@@ -9,7 +9,7 @@ export async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
   const response = await fetch(url.toString());
   if (response.status === 401 || response.status === 403) throw new Error('A busca de endereços foi recusada pelo serviço de mapas. Confira o token público configurado no app.');
   if (!response.ok) throw new Error('Não foi possível buscar este endereço. Tente novamente.');
-  const body = await response.json() as { features?: Array<{ id?: string; geometry?: { coordinates?: [number, number] }; properties?: { full_address?: string; name?: string; place_formatted?: string } }> };
+  const body = await response.json() as { features?: { id?: string; geometry?: { coordinates?: [number, number] }; properties?: { full_address?: string; name?: string; place_formatted?: string } }[] };
   return (body.features ?? []).flatMap((feature, index) => {
     const coordinates = feature.geometry?.coordinates;
     if (!coordinates) return [];

@@ -54,7 +54,7 @@ function RuntimeBridge() {
         const profile = await getProfile();
         if (alive) useAuthStore.getState().setPassenger(profile.passageiro);
         // Em produção esta consulta também revela imediatamente se houve atualização dos aceites legais.
-        try { await getExtrato(1, 0); } catch (_) { /* O interceptor marca LEGAL_CONSENT_REQUIRED quando aplicável. */ }
+        try { await getExtrato(1, 0); } catch { /* O interceptor marca LEGAL_CONSENT_REQUIRED quando aplicável. */ }
       } catch {
         await tokenStore.clear();
         useAuthStore.getState().clearSession();

@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { brl, km, minutes } from '@/utils/format';
 import { createIdempotencyKey } from '@/utils/idempotency';
-import {canCancelRide,isTerminalRide,rideStatusCopy,} from '@/features/corrida/rideState';
+import { canCancelRide, isTerminalRide, rideRefetchInterval, rideStatusCopy } from '@/features/corrida/rideState';
 
 describe('utils do MOVI Passageiro', () => {
   it('formata BRL, distância e duração', () => {
@@ -24,5 +24,10 @@ describe('utils do MOVI Passageiro', () => {
     expect(isTerminalRide('concluida')).toBe(true);
     expect(isTerminalRide('cancelada')).toBe(true);
     expect(rideStatusCopy('aceita').title).toBe('Motorista a caminho');
+    expect(rideRefetchInterval('solicitada')).toBe(10000);
+    expect(rideRefetchInterval('aceita')).toBe(10000);
+    expect(rideRefetchInterval('em_andamento')).toBe(10000);
+    expect(rideRefetchInterval('concluida')).toBe(false);
+    expect(rideRefetchInterval('cancelada')).toBe(false);
   });
 });

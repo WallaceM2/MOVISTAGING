@@ -8,7 +8,7 @@ import { createReport } from '@/features/denuncia/denunciaService';
 import type { ReportInput } from '@/types/api';
 import { colors } from '@/theme/colors';
 
-const reasons: Array<{ value: ReportInput['motivo']; label: string }> = [
+const reasons: { value: ReportInput['motivo']; label: string }[] = [
   { value: 'direcao_perigosa', label: 'Direção perigosa' },
   { value: 'assedio', label: 'Assédio' },
   { value: 'agressao', label: 'Agressão' },

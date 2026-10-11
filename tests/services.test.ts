@@ -1,14 +1,13 @@
 import {beforeEach,describe,expect,it,jest,} from '@jest/globals';
-
-jest.mock('@/api/http', () => ({
-  apiFetch: jest.fn(),
-}));
-
 import { apiFetch } from '@/api/http';
 import {
   estimateRide,
   requestRide,
 } from '@/features/corrida/corridaService';
+
+jest.mock('@/api/http', () => ({
+  apiFetch: jest.fn(),
+}));
 
 const apiFetchMock =
   apiFetch as jest.MockedFunction<typeof apiFetch>;
