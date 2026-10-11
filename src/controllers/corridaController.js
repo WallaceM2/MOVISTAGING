@@ -74,6 +74,7 @@ async function emitirOferta(corrida, motorista) {
     tempo_minutos: Number(corrida.tempo_minutos || 0),
     conta_verificada: true,
     forma_pagamento: corrida.forma_pagamento,
+    categoria: corrida.categoria,
     coordenadas: {
       origem: { lat: Number(corrida.origem_lat), lng: Number(corrida.origem_lng) },
       destino: { lat: Number(corrida.destino_lat), lng: Number(corrida.destino_lng) },

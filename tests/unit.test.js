@@ -216,7 +216,7 @@ test('arquivo de produção não admite APIs dinâmicas perigosas', () => {
   const server = fs.readFileSync(path.join(__dirname, '..', 'src/server.js'), 'utf8');
   assert.equal(/\beval\s*\(/.test(server), false);
   assert.equal(/\bnew\s+Function\s*\(/.test(server), false);
-  assert.match(fs.readFileSync(path.join(__dirname, '..', '.gitignore'), 'utf8'), /(^|\n)\.env(\n|$)/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', '.gitignore'), 'utf8'), /(^|\r?\n)\.env(\r?\n|$)/);
 });
 
 test('divisão financeira rejeita snapshot inconsistente', () => {
@@ -224,6 +224,88 @@ test('divisão financeira rejeita snapshot inconsistente', () => {
   assert.doesNotThrow(() => assertFinancialSnapshot({ valor: 100, ganho_motorista: 85, ganho_app: 15, percentual_comissao_app: 15, percentual_repasse_motorista: 85 }));
   assert.throws(() => assertFinancialSnapshot({ valor: 100, ganho_motorista: 50, ganho_app: 40, percentual_comissao_app: 15, percentual_repasse_motorista: 85 }), /Snapshot financeiro inconsistente/);
   assert.throws(() => assertFinancialSnapshot({ valor: 100, ganho_motorista: 86, ganho_app: 14, percentual_comissao_app: 15, percentual_repasse_motorista: 85 }), /Snapshot financeiro inconsistente/);
+});
+
+test('extrato separa ganhos acumulados dos ganhos concluídos nas últimas 24 horas', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const corridaPath = require.resolve('../src/models/Corrida');
+  const originalDatabase = require.cache[databasePath];
+  const originalCorrida = require.cache[corridaPath];
+  let statement = '';
+  let parameters;
+  require.cache[databasePath] = { exports: {
+    async query(sql, values) {
+      statement = sql;
+      parameters = values;
+      return { rows: [{ ganhos_motorista: '150.00', ganhos_ultimas_24h: '30.00', saldo_carteira: '-4.50' }] };
+    },
+  } };
+  delete require.cache[corridaPath];
+
+  try {
+    const Corrida = require('../src/models/Corrida');
+    const resumo = await Corrida.resumoParaUsuario({ tipo: 'motorista', id: 42 });
+    assert.deepEqual(parameters, [42, 'motorista']);
+    assert.match(statement, /status = 'concluida' AND finalizada_em >= NOW\(\) - INTERVAL '24 hours'/);
+    assert.match(statement, /AS ganhos_ultimas_24h/);
+    assert.equal(resumo.ganhos_motorista, '150.00');
+    assert.equal(resumo.ganhos_ultimas_24h, '30.00');
+    assert.equal(resumo.saldo_carteira, '-4.50');
+  } finally {
+    if (originalCorrida) require.cache[corridaPath] = originalCorrida;
+    else delete require.cache[corridaPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase;
+    else delete require.cache[databasePath];
+  }
+});
+
+test('finalização em dinheiro registra ganho do motorista separado da taxa debitada na carteira', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const corridaPath = require.resolve('../src/models/Corrida');
+  const originalDatabase = require.cache[databasePath];
+  const originalCorrida = require.cache[corridaPath];
+  const calls = [];
+  const fakeClient = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT \* FROM corridas/.test(sql)) return { rows: [{
+        id: 73, passageiro_id: 8, motorista_id: 42, status: 'em_andamento', status_pagamento: 'pendente',
+        forma_pagamento: 'dinheiro', valor: '100.00', ganho_motorista: '85.00', ganho_app: '15.00',
+      }] };
+      if (/SELECT saldo_carteira, bloqueado_dinheiro/.test(sql)) return { rows: [{ saldo_carteira: '5.00', bloqueado_dinheiro: false }] };
+      if (/SELECT id FROM transacoes_motoristas/.test(sql)) return { rows: [] };
+      if (/INSERT INTO movi_pagamentos/.test(sql)) return { rows: [{ id: 900 }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => fakeClient } };
+  delete require.cache[corridaPath];
+
+  try {
+    const Corrida = require('../src/models/Corrida');
+    const result = await Corrida.finalizarComPagamento(73, 42, { status_pagamento: 'pago', valor_recebido_motorista: 100 });
+    const walletUpdate = calls.find(({ sql }) => /UPDATE motoristas SET saldo_carteira/.test(sql));
+    const paymentInsert = calls.find(({ sql }) => /INSERT INTO movi_pagamentos/.test(sql));
+    const ledgerEntries = calls.filter(({ sql }) => /INSERT INTO movi_lancamentos_financeiros/.test(sql));
+    assert.equal(result.sucesso, true);
+    assert.deepEqual(walletUpdate.values, [-10, true, 42]);
+    assert.equal(paymentInsert.values[4], 'pago');
+    assert.equal(paymentInsert.values[6], 100);
+    assert.match(paymentInsert.sql, /CASE WHEN \$5::varchar = 'pago'::varchar/);
+    assert.ok(ledgerEntries.every(({ sql }) => /VALUES \(\$1,\$2,\$3,\$4,\$5,\$6,'BRL',\$7,\$8::jsonb\)/.test(sql)));
+    assert.ok(ledgerEntries.every(({ sql }) => /ON CONFLICT \(referencia_unica\) WHERE referencia_unica IS NOT NULL DO NOTHING/.test(sql)));
+    assert.deepEqual(ledgerEntries.map(({ values }) => [values[4], values[5]]), [
+      ['corrida_bruta', 100], ['repasse_motorista', -85], ['comissao_app', -15],
+    ]);
+    assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
+    assert.equal(calls.some(({ sql }) => sql === 'ROLLBACK'), false);
+  } finally {
+    if (originalCorrida) require.cache[corridaPath] = originalCorrida;
+    else delete require.cache[corridaPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase;
+    else delete require.cache[databasePath];
+  }
 });
 
 test('matching reconstrói o GEO quando o índice está vazio mas o estado persistente é válido', async () => {

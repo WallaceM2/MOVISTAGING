@@ -34,8 +34,8 @@ async function registrarLedgerCorrida(client, corrida, pagamentoId = null) {
       INSERT INTO movi_lancamentos_financeiros (
         corrida_id, pagamento_id, motorista_id, passageiro_id, tipo, valor, moeda, referencia_unica, metadata
       )
-      VALUES ($1,$2,$3,$4,$5,'BRL',$6,$7,$8::jsonb)
-      ON CONFLICT (referencia_unica) DO NOTHING;
+      VALUES ($1,$2,$3,$4,$5,$6,'BRL',$7,$8::jsonb)
+      ON CONFLICT (referencia_unica) WHERE referencia_unica IS NOT NULL DO NOTHING;
     `, [corrida.id, pagamentoId, corrida.motorista_id, corrida.passageiro_id, entry.tipo, entry.valor, entry.ref, JSON.stringify(entry.metadata)]);
   }
 }
@@ -432,7 +432,7 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
 
     const paymentResult = await client.query(`
       INSERT INTO movi_pagamentos (corrida_id, passageiro_id, motorista_id, metodo, status, valor, valor_pago, moeda, atualizado_em, pago_em, metadata)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,'BRL',NOW(),CASE WHEN $5 = 'pago' THEN NOW() ELSE NULL END,$8::jsonb)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'BRL',NOW(),CASE WHEN $5::varchar = 'pago'::varchar THEN NOW() ELSE NULL END,$8::jsonb)
       ON CONFLICT (corrida_id) DO UPDATE SET
         motorista_id = EXCLUDED.motorista_id,
         metodo = EXCLUDED.metodo,
@@ -475,6 +475,9 @@ async function resumoParaUsuario({ tipo, id }) {
       COUNT(*)::int AS total_corridas,
       COUNT(*) FILTER (WHERE status = 'concluida')::int AS corridas_concluidas,
       COALESCE(SUM(ganho_motorista) FILTER (WHERE status = 'concluida'), 0)::numeric(12,2) AS ganhos_motorista,
+      COALESCE(SUM(ganho_motorista) FILTER (
+        WHERE status = 'concluida' AND finalizada_em >= NOW() - INTERVAL '24 hours'
+      ), 0)::numeric(12,2) AS ganhos_ultimas_24h,
       COALESCE(SUM(valor) FILTER (WHERE status = 'concluida'), 0)::numeric(12,2) AS valor_total_corridas,
       CASE WHEN $2 = 'motorista' THEN (SELECT saldo_carteira FROM motoristas WHERE id = $1) ELSE NULL END AS saldo_carteira
     FROM corridas WHERE ${coluna} = $1;
