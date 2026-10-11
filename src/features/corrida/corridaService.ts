@@ -41,6 +41,7 @@ export type Ride = RideOffer & {
 export type DriverStatement = {
   saldo_total: string | null;
   ganhos_acumulados: string | null;
+  ganhos_ultimas_24h: string | null;
   total_viagens: number;
   corridas_concluidas: number;
   valor_total_corridas: string;

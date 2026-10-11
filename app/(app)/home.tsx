@@ -74,7 +74,7 @@ export default function DriverHome() {
     if (!approved) return;
     const socket = getSocket();
     if (!socket) return;
-    const refreshOffers = () => { void getOffers().then((items) => { if (items[0]) setOffer((current) => current ?? { ...items[0], validadeCliente: items[0].expira_em ? new Date(items[0].expira_em).getTime() : undefined }); }).catch(() => undefined); };
+    const refreshOffers = () => { void getOffers().then((items) => { const active = items[0]; setOffer(active ? { ...active, validadeCliente: active.expira_em ? new Date(active.expira_em).getTime() : Date.now() + 30000 } : null); }).catch(() => undefined); };
     const onConnect = () => setConnected(true);
     const onDisconnect = () => setConnected(false);
     socket.on("connect", onConnect);
@@ -84,6 +84,24 @@ export default function DriverHome() {
     if (socket.connected) refreshOffers(); else socket.once("connect", refreshOffers);
     return () => { unsubscribeRide(); socket.off("connect", onConnect); socket.off("disconnect", onDisconnect); socket.off("connect", refreshOffers); };
   }, [approved]);
+  useEffect(() => {
+    if (!approved || !online) return;
+    let active = true;
+    const refreshOffers = async () => {
+      try {
+        const items = await getOffers();
+        if (!active) return;
+        const current = items[0];
+        setOffer(current ? { ...current, validadeCliente: current.expira_em ? new Date(current.expira_em).getTime() : Date.now() + 30000 } : null);
+      } catch {
+        // Realtime remains the primary delivery path; a transient polling error
+        // should not clear an offer that may still be accepted.
+      }
+    };
+    void refreshOffers();
+    const timer = setInterval(() => void refreshOffers(), 5000);
+    return () => { active = false; clearInterval(timer); };
+  }, [approved, online]);
   useEffect(() => {
     if (!accessToken) return;
     const timer = setInterval(() => sendHeartbeat(), 25000);
@@ -173,7 +191,7 @@ export default function DriverHome() {
     {profile.isLoading ? <Surface style={styles.loading}><ActivityIndicator color={palette.forest} /><Text style={styles.muted}>Carregando sua área segura…</Text></Surface> : null}
     {profile.isError ? <Surface style={styles.notice}><Text style={styles.noticeTitle}>Não conseguimos carregar seu perfil</Text><Text style={styles.muted}>Verifique sua conexão. Seus dados continuam protegidos.</Text><Pressable onPress={() => void profile.refetch()}><Text style={styles.link}>Tentar novamente</Text></Pressable></Surface> : null}
     {driver && !approved ? <Surface style={styles.pending}><View style={styles.pendingIcon}><MaterialCommunityIcons name="shield-lock-outline" size={23} color={palette.amber} /></View><View style={{ flex: 1, gap: 4 }}><Text style={styles.pendingTitle}>{driver.status_conta !== "ativa" ? "Conta temporariamente indisponível" : driver.status_cadastro === "reprovado" ? "Revise seu cadastro" : "Estamos analisando seu cadastro"}</Text><Text style={styles.pendingCopy}>{driver.status_conta !== "ativa" ? "Fale com o suporte para entender o status da conta." : driver.status_cadastro === "reprovado" ? "Confira os documentos e atualize o que estiver pendente." : "A equipe MOVI está conferindo suas informações e documentos."}</Text></View></Surface> : null}
-    <Surface style={[styles.balance, online && styles.balanceOnline]}><View style={styles.balanceTop}><View><Text style={styles.balanceLabel}>GANHOS ACUMULADOS</Text><Text style={styles.balanceValue}>{money(statement.data?.ganhos_acumulados)}</Text></View><View style={[styles.onlineBadge, { backgroundColor: online ? palette.lime : "#E8EEEA" }]}><View style={[styles.dot, { backgroundColor: online ? palette.forest : palette.muted }]} /><Text style={[styles.onlineText, online && { color: palette.forestDark }]}>{online ? "ONLINE" : "OFFLINE"}</Text></View></View><View style={styles.balanceDivider} /><View style={styles.metrics}><View><Text style={styles.metricValue}>{statement.data?.corridas_concluidas ?? 0}</Text><Text style={styles.metricLabel}>corridas concluídas</Text></View><View style={styles.metricSeparator} /><View><Text style={styles.metricValue}>{driver?.nota_media ? Number(driver.nota_media).toFixed(1) : "—"}<Text style={styles.star}> ★</Text></Text><Text style={styles.metricLabel}>avaliação média</Text></View><View style={styles.metricSeparator} /><View><Text style={styles.metricValue}>{money(statement.data?.saldo_total)}</Text><Text style={styles.metricLabel}>saldo atual</Text></View></View></Surface>
+    <Surface style={[styles.balance, online && styles.balanceOnline]}><View style={styles.balanceTop}><View><Text style={styles.balanceLabel}>GANHOS NAS ÚLTIMAS 24H</Text><Text style={styles.balanceValue}>{money(statement.data?.ganhos_ultimas_24h)}</Text></View><View style={[styles.onlineBadge, { backgroundColor: online ? palette.lime : "#E8EEEA" }]}><View style={[styles.dot, { backgroundColor: online ? palette.forest : palette.muted }]} /><Text style={[styles.onlineText, online && { color: palette.forestDark }]}>{online ? "ONLINE" : "OFFLINE"}</Text></View></View><View style={styles.balanceDivider} /><View style={styles.metrics}><View><Text style={styles.metricValue}>{statement.data?.corridas_concluidas ?? 0}</Text><Text style={styles.metricLabel}>corridas concluídas</Text></View><View style={styles.metricSeparator} /><View><Text style={styles.metricValue}>{driver?.nota_media ? Number(driver.nota_media).toFixed(1) : "—"}<Text style={styles.star}> ★</Text></Text><Text style={styles.metricLabel}>avaliação média</Text></View><View style={styles.metricSeparator} /><View><Text style={styles.metricValue}>{money(statement.data?.saldo_total)}</Text><Text style={styles.metricLabel}>carteira</Text></View></View></Surface>
     <AppButton title={online ? "Ficar offline" : "Ficar online"} loading={busy} disabled={!approved || internet === false} onPress={() => void setOnlineStatus()} />
     <View style={styles.connection}><View style={[styles.connectionDot, { backgroundColor: internet === false ? palette.red : connected ? palette.forest : palette.amber }]} /><Text style={styles.connectionText}>{internet === false ? "Sem internet" : connected ? "Conectado ao MOVI" : "Conectando ao MOVI…"}</Text><Text style={styles.connectionHint}>•  {driver?.categoria === "carro" ? "Carro" : "Moto"}</Text></View>
     <DriverMap coordinate={coords} height={210} label={online ? "Você está visível para receber corridas" : "Sua localização só é usada quando você fica online"} />

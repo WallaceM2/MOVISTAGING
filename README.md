@@ -31,7 +31,7 @@ Builds de produção aceitam somente API em HTTPS. HTTP fica restrito a builds d
 - As ofertas usam `nova_oferta_corrida` e os campos que o backend V3 emite. O aceite e a recusa usam endpoints com `Idempotency-Key`.
 - Para começar uma corrida, o passageiro apresenta o código de embarque exibido no app dele. O servidor valida o código, conta tentativas incorretas e aplica bloqueio temporário após cinco erros.
 - A finalização informa apenas o valor recebido em dinheiro. Pagamento digital só é concluído se o backend já o tiver confirmado pelo provedor.
-- O extrato e os ganhos vêm da API; o app não calcula tarifa, comissão, saldo ou quitação.
+- O extrato e os ganhos vêm da API; o app não calcula tarifa, comissão, saldo ou quitação. A tela inicial separa ganhos das últimas 24 horas (incluindo corridas concluídas em dinheiro) do saldo da carteira.
 
 ## Segurança e privacidade
 
