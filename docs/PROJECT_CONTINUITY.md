@@ -49,7 +49,8 @@ O PostgreSQL de desenvolvimento configurado agora tem 10 migrations (`000` a `00
 - V3: migration runner normaliza CRLF para LF antes de calcular checksums, evitando divergência entre Windows e Unix sem enfraquecer a validação de mudanças reais nos arquivos.
 - V3: revisão de fluxo encontrou e corrigiu o retorno à fila quando o usuário responde a um chamado em `aguardando_usuario`; respostas também reabrem chamados `resolvido`, e chamados `fechado` continuam bloqueados.
 - V3: teste HTTP de suporte percorre autenticação, validação, isolamento entre usuários, fila/resposta administrativa, transições e auditoria sem texto da conversa. Teste integrado com PostgreSQL de desenvolvimento confirmou os mesmos fluxos com dados sintéticos, removidos ao final.
-- V3: `npm run test:all` passou com 25 testes, análise sintática e `security:check`. `db:check` já havia confirmado as 10 migrations após a 009.
+- V3: finalização financeira agora rejeita o estado interno `pendente` e pagamento parcial com recebimento zero, mesmo se chamada fora da validação HTTP.
+- V3: `npm run test:all` passou com 26 testes, análise sintática e `security:check`. `db:check` confirmou as 10 migrations após a 009.
 
 ## Pendências e bloqueios
 
@@ -62,10 +63,11 @@ O PostgreSQL de desenvolvimento configurado agora tem 10 migrations (`000` a `00
 ## Próxima sequência
 
 1. Integrar os endpoints de suporte nos apps e criar uma fila/painel para atendimento humano; definir operação real para cumprir a estimativa de 24–48 horas.
-2. Validar corrida parcialmente paga/não paga e os limites de carteira com regras de produto definidas.
-3. Tratar alertas de dependências nas pastas PSG e MTA com atualização compatível, validando bundles, typecheck, testes e APKs.
-4. Confirmar requisito de expiração móvel das 24 horas em cenário controlado por teste.
-5. Só declarar pronto para operação após revisão de segurança, requisitos legais/operacionais e estratégia de observabilidade.
+2. Definir como registrar ganho do motorista, comissão e dívida quando o passageiro paga parcialmente ou não paga. Hoje o resumo móvel soma o ganho integral de toda corrida concluída; o débito do passageiro guarda o valor faltante, mas não existe provedor nem fluxo administrativo para liquidá-lo.
+3. Validar corrida parcialmente paga/não paga e os limites de carteira depois da definição da regra financeira.
+4. Tratar alertas de dependências nas pastas PSG e MTA com atualização compatível, validando bundles, typecheck, testes e APKs.
+5. Confirmar requisito de expiração móvel das 24 horas em cenário controlado por teste.
+6. Só declarar pronto para operação após revisão de segurança, requisitos legais/operacionais e estratégia de observabilidade.
 
 ## Privacidade
 

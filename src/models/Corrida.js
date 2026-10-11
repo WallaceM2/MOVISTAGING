@@ -6,7 +6,7 @@ const env = require('../config/env');
 
 const ACTIVE_STATUSES = ['solicitada', 'aceita', 'em_andamento'];
 
-const PAYMENT_STATUS = new Set(['pendente', 'pago', 'parcial', 'nao_pago', 'cancelado', 'estornado', 'reembolsado']);
+const FINALIZABLE_PAYMENT_STATUSES = new Set(['pago', 'parcial', 'nao_pago']);
 
 function assertFinancialSnapshot({ valor, ganho_motorista, ganho_app, percentual_comissao_app, percentual_repasse_motorista }) {
   const gross = Number(valor);
@@ -361,7 +361,7 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
     let statusFinal = status_pagamento;
     let recebido = valor_recebido_motorista == null ? null : Number(valor_recebido_motorista);
     const valorTotal = Number(corrida.valor);
-    if (!PAYMENT_STATUS.has(statusFinal)) throw new AppError('Status de pagamento inválido.', 400, 'INVALID_PAYMENT_STATUS');
+    if (!FINALIZABLE_PAYMENT_STATUSES.has(statusFinal)) throw new AppError('Status de pagamento inválido.', 400, 'INVALID_PAYMENT_STATUS');
 
     if (corrida.forma_pagamento !== 'dinheiro') {
       if (corrida.status_pagamento !== 'pago') {
@@ -373,7 +373,7 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       if (recebido == null && statusFinal !== 'nao_pago') throw new AppError('Informe o valor efetivamente recebido em uma corrida em dinheiro.', 400, 'PAYMENT_VALUE_REQUIRED');
       if (recebido != null && (recebido < 0 || recebido > valorTotal + 0.01)) throw new AppError('Valor recebido inválido.', 400, 'INVALID_PAYMENT_VALUE');
       if (statusFinal === 'pago' && Math.abs(recebido - valorTotal) > 0.01) throw new AppError('Para marcar uma corrida em dinheiro como paga, o valor recebido deve corresponder ao total da corrida.', 400, 'PAYMENT_VALUE_MISMATCH');
-      if (statusFinal === 'parcial' && (recebido == null || recebido >= valorTotal)) throw new AppError('Pagamento parcial exige valor recebido menor que o valor total.', 400, 'INVALID_PARTIAL_PAYMENT');
+      if (statusFinal === 'parcial' && (recebido == null || recebido <= 0 || recebido >= valorTotal)) throw new AppError('Pagamento parcial exige um valor recebido positivo e menor que o total da corrida.', 400, 'INVALID_PARTIAL_PAYMENT');
       if (statusFinal === 'nao_pago' && Number(recebido || 0) > 0) throw new AppError('Pagamento não pago não pode possuir valor recebido.', 400, 'INVALID_UNPAID_PAYMENT');
     }
 

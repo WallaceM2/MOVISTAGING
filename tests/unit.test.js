@@ -310,6 +310,46 @@ test('finalização em dinheiro registra ganho do motorista separado da taxa deb
   }
 });
 
+test('finalização rejeita status pendente e parcial sem valor recebido positivo', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const corridaPath = require.resolve('../src/models/Corrida');
+  const originalDatabase = require.cache[databasePath];
+  const originalCorrida = require.cache[corridaPath];
+  const cases = [
+    { payment: { status_pagamento: 'pendente', valor_recebido_motorista: 0 }, code: 'INVALID_PAYMENT_STATUS' },
+    { payment: { status_pagamento: 'parcial', valor_recebido_motorista: 0 }, code: 'INVALID_PARTIAL_PAYMENT' },
+  ];
+
+  try {
+    for (const { payment, code } of cases) {
+      const calls = [];
+      const client = {
+        async query(sql) {
+          calls.push(sql);
+          if (/SELECT \* FROM corridas/.test(sql)) return { rows: [{
+            id: 73, passageiro_id: 8, motorista_id: 42, status: 'em_andamento', status_pagamento: 'pendente',
+            forma_pagamento: 'dinheiro', valor: '100.00', ganho_motorista: '85.00', ganho_app: '15.00',
+          }] };
+          return { rows: [] };
+        },
+        release() {},
+      };
+      require.cache[databasePath] = { exports: { connect: async () => client } };
+      delete require.cache[corridaPath];
+      const Corrida = require('../src/models/Corrida');
+
+      await assert.rejects(Corrida.finalizarComPagamento(73, 42, payment), (error) => error.code === code);
+      assert.equal(calls.some((sql) => /UPDATE corridas/.test(sql)), false);
+      assert.equal(calls.includes('ROLLBACK'), true);
+    }
+  } finally {
+    if (originalCorrida) require.cache[corridaPath] = originalCorrida;
+    else delete require.cache[corridaPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase;
+    else delete require.cache[databasePath];
+  }
+});
+
 test('matching reconstrói o GEO quando o índice está vazio mas o estado persistente é válido', async () => {
   const redisPath = require.resolve('../src/config/redis');
   const databasePath = require.resolve('../src/config/database');
