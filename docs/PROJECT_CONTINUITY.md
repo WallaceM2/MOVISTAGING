@@ -14,7 +14,7 @@ O fluxo de aceite esperado é: passageiro solicita em dinheiro → motorista rec
 |---|---|---|
 | MOVI PSG | `passageiro` / `d4d1d3a` | Commit de recuperação de status/localização enviado a origin |
 | MOVI MTA | `motorista` / `d15f2da` | Ganhos móveis e atualização de ofertas enviados a origin |
-| MOVI V3 | `backend` / `a77a2b0` | Finalização financeira em dinheiro enviada a origin; implementação de suporte em andamento |
+| MOVI V3 | `backend` / `8000c5c` | Central de suporte e migration 009 enviadas a origin |
 
 O PostgreSQL de desenvolvimento configurado agora tem 10 migrations (`000` a `009`); `db:check` retornou `ok: true`, sem problemas.
 
@@ -47,7 +47,9 @@ O PostgreSQL de desenvolvimento configurado agora tem 10 migrations (`000` a `00
 - V3: primeira versão da central de suporte implementada com FAQ/triagem determinística, chamados e mensagens, fila administrativa, controle de acesso por participante, auditoria sem texto da conversa e estimativa de primeira resposta humana em 24–48 horas corridas.
 - V3: migration `009_support_center.sql` aplicada ao banco de desenvolvimento. `db:check` retornou 10 migrations, `ok: true`.
 - V3: migration runner normaliza CRLF para LF antes de calcular checksums, evitando divergência entre Windows e Unix sem enfraquecer a validação de mudanças reais nos arquivos.
-- V3: testes do suporte cobrem prioridade de segurança, validação, criação transacional e isolamento de chamados; `npm run test:all` passou com 23 testes, análise sintática e security check antes da alteração de portabilidade; repetir após mudanças finais.
+- V3: revisão de fluxo encontrou e corrigiu o retorno à fila quando o usuário responde a um chamado em `aguardando_usuario`; respostas também reabrem chamados `resolvido`, e chamados `fechado` continuam bloqueados.
+- V3: teste HTTP de suporte percorre autenticação, validação, isolamento entre usuários, fila/resposta administrativa, transições e auditoria sem texto da conversa. Teste integrado com PostgreSQL de desenvolvimento confirmou os mesmos fluxos com dados sintéticos, removidos ao final.
+- V3: `npm run test:all` passou com 25 testes, análise sintática e `security:check`. `db:check` já havia confirmado as 10 migrations após a 009.
 
 ## Pendências e bloqueios
 

@@ -103,7 +103,7 @@ async function addRequesterMessage({ ticketId, requesterType, requesterId, messa
     `, [ticketId, requesterType, requesterId, message]);
     await client.query(`
       UPDATE movi_suporte_chamados
-      SET status = CASE WHEN status = 'resolvido' THEN 'em_atendimento' ELSE status END,
+      SET status = CASE WHEN status IN ('aguardando_usuario', 'resolvido') THEN 'em_atendimento' ELSE status END,
           resolvido_em = CASE WHEN status = 'resolvido' THEN NULL ELSE resolvido_em END,
           atualizado_em = NOW()
       WHERE id = $1;
@@ -191,10 +191,10 @@ async function updateStatus({ ticketId, adminId, status }) {
     }
     const { rows } = await client.query(`
       UPDATE movi_suporte_chamados
-      SET status = $1,
-          primeira_resposta_em = CASE WHEN $1 = 'resolvido' THEN COALESCE(primeira_resposta_em, NOW()) ELSE primeira_resposta_em END,
-          resolvido_em = CASE WHEN $1 = 'resolvido' THEN NOW() WHEN $1 = 'em_atendimento' THEN NULL ELSE resolvido_em END,
-          fechado_em = CASE WHEN $1 = 'fechado' THEN NOW() ELSE fechado_em END,
+      SET status = $1::varchar,
+          primeira_resposta_em = CASE WHEN $1::varchar = 'resolvido' THEN COALESCE(primeira_resposta_em, NOW()) ELSE primeira_resposta_em END,
+          resolvido_em = CASE WHEN $1::varchar = 'resolvido' THEN NOW() WHEN $1::varchar = 'em_atendimento' THEN NULL ELSE resolvido_em END,
+          fechado_em = CASE WHEN $1::varchar = 'fechado' THEN NOW() ELSE fechado_em END,
           atualizado_em = NOW()
       WHERE id = $2
       RETURNING *;

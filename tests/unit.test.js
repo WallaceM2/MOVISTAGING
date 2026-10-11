@@ -450,3 +450,46 @@ test('chamado não é encontrado quando solicitante tenta acessar ticket de outr
     if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
   }
 });
+
+test('resposta do usuário reabre chamados aguardando resposta ou já resolvidos', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const modelPath = require.resolve('../src/models/SupportTicket');
+  const originalDatabase = require.cache[databasePath];
+  const originalModel = require.cache[modelPath];
+  const cases = ['aguardando_usuario', 'resolvido'];
+
+  try {
+    for (const status of cases) {
+      const calls = [];
+      const client = {
+        async query(sql) {
+          calls.push(sql);
+          if (/SELECT id, status FROM movi_suporte_chamados/.test(sql)) {
+            return { rows: [{ id: 501, status }] };
+          }
+          return { rows: [] };
+        },
+        release() {},
+      };
+      require.cache[databasePath] = { exports: { connect: async () => client } };
+      delete require.cache[modelPath];
+
+      const SupportTicket = require('../src/models/SupportTicket');
+      await SupportTicket.addRequesterMessage({
+        ticketId: 501,
+        requesterType: 'passageiro',
+        requesterId: 7,
+        message: 'Estou enviando as informações solicitadas pelo suporte.',
+      });
+
+      const update = calls.find((sql) => /UPDATE movi_suporte_chamados/.test(sql));
+      assert.match(update, /status IN \('aguardando_usuario', 'resolvido'\)/);
+      if (status === 'resolvido') assert.match(update, /resolvido_em = CASE WHEN status = 'resolvido' THEN NULL/);
+      assert.equal(calls.includes('COMMIT'), true);
+      assert.equal(calls.includes('ROLLBACK'), false);
+    }
+  } finally {
+    if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
+});
