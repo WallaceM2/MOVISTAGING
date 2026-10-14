@@ -4,6 +4,7 @@ import {
   estimateRide,
   requestRide,
 } from '@/features/corrida/corridaService';
+import { contestCancellationFee, getCashDebts, respondToCashDebt } from '@/features/perfil/debtService';
 
 jest.mock('@/api/http', () => ({
   apiFetch: jest.fn(),
@@ -64,5 +65,37 @@ describe('integração de domínio de corrida', () => {
     ).toBeGreaterThanOrEqual(16);
 
     expect(firstCall?.[0]).toBe('/api/corridas/solicitar');
+  });
+});
+
+describe('integração de consulta e resposta de débito', () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+  });
+
+  it('consulta débitos por corrida no V3', async () => {
+    apiFetchMock.mockResolvedValueOnce({ debitos: [], taxas_cancelamento: [], total_pendente: 0 } as never);
+    await expect(getCashDebts()).resolves.toEqual({ debitos: [], taxas_cancelamento: [], total_pendente: 0 });
+    expect(apiFetchMock.mock.calls[0]?.[0]).toBe('/api/passageiros/debitos');
+  });
+
+  it('envia contestação com relato e chave de idempotência', async () => {
+    apiFetchMock.mockResolvedValueOnce({ mensagem: 'Resposta registrada.', corrida_id: 73, resposta_passageiro: 'contestada', suporte_chamado_id: 501 } as never);
+    await respondToCashDebt(73, { decisao: 'contestar', descricao: 'Discordo do valor; paguei a diferença por Pix ao motorista.' });
+    const [path, options] = apiFetchMock.mock.calls[0] ?? [];
+    expect(path).toBe('/api/passageiros/debitos/73/resposta');
+    expect(options?.method).toBe('POST');
+    expect(JSON.parse(String(options?.body))).toEqual({ decisao: 'contestar', descricao: 'Discordo do valor; paguei a diferença por Pix ao motorista.' });
+    expect(options?.idempotencyKey).toMatch(/^debito-73-contestar-/);
+  });
+
+  it('contesta uma taxa de cancelamento pelo contrato V3 com idempotência', async () => {
+    apiFetchMock.mockResolvedValueOnce({ mensagem: 'Contestação encaminhada.', corrida_id: 73, status: 'contestada', suporte_chamado_id: 502, debito_preservado: true } as never);
+    await contestCancellationFee(73, 'Discordo da taxa porque o aceite ocorreu depois do horário informado.');
+    const [path, options] = apiFetchMock.mock.calls[0] ?? [];
+    expect(path).toBe('/api/passageiros/taxas-cancelamento/73/contestar');
+    expect(options?.method).toBe('POST');
+    expect(JSON.parse(String(options?.body))).toEqual({ descricao: 'Discordo da taxa porque o aceite ocorreu depois do horário informado.' });
+    expect(options?.idempotencyKey).toMatch(/^taxa-cancelamento-73-contestar-/);
   });
 });

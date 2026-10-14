@@ -111,6 +111,7 @@ export type Ride = {
   finalizada_em?: string;
   cancelada_em?: string;
   atualizado_em?: string;
+  taxa_cancelamento?: { valor: number | string; status: 'pendente' | 'contestada' | 'liquidada' | 'cancelada'; repasse_status: 'creditado_carteira' | 'liquidado'; creditado_carteira_em: string; criada_em: string; destinatario: 'motorista' };
 };
 
 export type LegalDocument = {

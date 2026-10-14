@@ -9,11 +9,12 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
+    "test:support-contract": "node --test tests/support-service.contract.test.cjs",
     "lint": "eslint .",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "doctor": "expo doctor",
-    "verify": "npm run verify:structure && npm run typecheck && npm test -- --coverage && npm run lint",
+    "verify": "npm run verify:structure && npm run typecheck && npm test -- --coverage && npm run test:support-contract && npm run lint",
     "test:ci": "npm test -- --ci --coverage",
     "verify:structure": "node scripts_verify_frontend.mjs"
   },

@@ -32,8 +32,23 @@ export default function RideStatusScreen() {
   }), [rideId]);
 
   async function onCancel() {
-    try { await cancelRide(rideId); await query.refetch(); }
-    catch (error) { Alert.alert('Não foi possível cancelar', error instanceof Error ? error.message : 'Tente novamente.'); }
+    const acceptedRide = ride?.status === 'aceita' && Boolean(ride.motorista_id);
+    const acceptedAtMs = ride?.aceita_em ? new Date(ride.aceita_em).getTime() : Number.NaN;
+    const feeWindowElapsed = acceptedRide && Number.isFinite(acceptedAtMs) && Date.now() - acceptedAtMs >= 180_000;
+    Alert.alert(
+      'Cancelar corrida?',
+      acceptedRide
+        ? feeWindowElapsed
+          ? 'Já passaram 3 minutos desde o aceite. Se confirmar o cancelamento, será registrado um débito de R$ 3,00 e o valor será creditado imediatamente na carteira MOVI do motorista. O servidor confirma o tempo e o débito continua em aberto até a quitação.'
+          : 'Ainda não passaram 3 minutos desde o aceite, pelo horário deste aparelho. O servidor valida o tempo exato no momento do cancelamento; se o limite tiver sido atingido, será registrado um débito de R$ 3,00 e creditado na carteira MOVI do motorista.'
+        : 'Como nenhum motorista aceitou a corrida, não será aplicada taxa de cancelamento.',
+      [
+        { text: 'Continuar corrida', style: 'cancel' },
+        { text: 'Confirmar cancelamento', style: 'destructive', onPress: () => {
+          void cancelRide(rideId).then(() => query.refetch()).catch((error) => Alert.alert('Não foi possível cancelar', error instanceof Error ? error.message : 'Tente novamente.'));
+        } },
+      ],
+    );
   }
 
   function returnToHome() {
@@ -69,6 +84,7 @@ export default function RideStatusScreen() {
       <Text style={styles.meta}>Pagamento: {ride.forma_pagamento}</Text>
       <Text style={styles.meta}>Origem: {ride.origem}</Text>
       <Text style={styles.meta}>Destino: {ride.destino}</Text>
+      {ride.taxa_cancelamento ? <Text style={styles.fee}>Taxa de cancelamento: {brl(ride.taxa_cancelamento.valor)} · débito {ride.taxa_cancelamento.status === 'contestada' ? 'em análise' : 'pendente'}. O motorista já recebeu esse valor como crédito na carteira MOVI; seu débito continua em aberto até a quitação.</Text> : null}
       {ride.status === 'aceita' && ride.motorista ? <><Text style={styles.driverTitle}>Seu motorista</Text><Text style={styles.meta}>{ride.motorista.nome} {ride.motorista.sobrenome ?? ''} • {ride.motorista.categoria === 'moto' ? 'Moto' : 'Carro'}{ride.motorista.nota_media ? ` • ★ ${Number(ride.motorista.nota_media).toFixed(1)}` : ''}</Text>{ride.motorista.modelo || ride.motorista.cor ? <Text style={styles.meta}>Veículo: {[ride.motorista.marca, ride.motorista.modelo, ride.motorista.cor].filter(Boolean).join(' ')}</Text> : null}{ride.motorista.placa ? <Text style={styles.plate}>{ride.motorista.placa}</Text> : null}</> : null}
     </Card>
     {ride.status === 'aceita' && ride.codigo_embarque ? <Card><Text style={styles.driverTitle}>Código seguro de embarque</Text><Text style={styles.code}>{ride.codigo_embarque}</Text><Text style={styles.codeHint}>Mostre este código ao motorista quando ele chegar. Ele precisa validá-lo para iniciar a corrida.</Text></Card> : null}
@@ -79,4 +95,4 @@ export default function RideStatusScreen() {
   </Screen>;
 }
 
-const styles = StyleSheet.create({ status: { fontSize: 24, fontWeight: '900', color: colors.text }, subtitle: { color: colors.muted, lineHeight: 20, marginTop: 6 }, live: { color: colors.success, marginTop: 10, fontWeight: '700' }, value: { fontSize: 32, fontWeight: '900', color: colors.text, marginTop: 18 }, meta: { color: colors.muted, marginTop: 8 }, driverTitle: { color: colors.text, fontWeight: '900', marginTop: 16, fontSize: 16 }, plate: { color: colors.text, fontWeight: '900', fontSize: 21, letterSpacing: 2, marginTop: 10 }, code: { color: colors.text, fontWeight: '900', fontSize: 30, letterSpacing: 8, textAlign: 'center', marginVertical: 10 }, codeHint: { color: colors.muted, lineHeight: 19, textAlign: 'center', fontSize: 13 } });
+const styles = StyleSheet.create({ status: { fontSize: 24, fontWeight: '900', color: colors.text }, subtitle: { color: colors.muted, lineHeight: 20, marginTop: 6 }, live: { color: colors.success, marginTop: 10, fontWeight: '700' }, value: { fontSize: 32, fontWeight: '900', color: colors.text, marginTop: 18 }, meta: { color: colors.muted, marginTop: 8 }, fee: { color: colors.danger, marginTop: 12, lineHeight: 20, fontWeight: '700' }, driverTitle: { color: colors.text, fontWeight: '900', marginTop: 16, fontSize: 16 }, plate: { color: colors.text, fontWeight: '900', fontSize: 21, letterSpacing: 2, marginTop: 10 }, code: { color: colors.text, fontWeight: '900', fontSize: 30, letterSpacing: 8, textAlign: 'center', marginVertical: 10 }, codeHint: { color: colors.muted, lineHeight: 19, textAlign: 'center', fontSize: 13 } });
