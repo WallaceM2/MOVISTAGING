@@ -19,5 +19,10 @@ const cadastroPassageiroSchema = z.object({
 }).strict();
 
 const loginSchema = z.object({ email, senha: z.string().min(1).max(128) }).strict();
+const respostaDebitoSchema = z.discriminatedUnion('decisao', [
+  z.object({ decisao: z.literal('confirmar') }).strict(),
+  z.object({ decisao: z.literal('contestar'), descricao: z.string().trim().min(20).max(2000) }).strict(),
+]);
+const contestacaoTaxaCancelamentoSchema = z.object({ descricao: z.string().trim().min(20).max(2000) }).strict();
 
-module.exports = { cadastroPassageiroSchema, loginSchema };
+module.exports = { cadastroPassageiroSchema, loginSchema, respostaDebitoSchema, contestacaoTaxaCancelamentoSchema };

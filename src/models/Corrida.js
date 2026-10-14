@@ -3,6 +3,8 @@ const AppError = require('../errors/AppError');
 const { assertRideTransition } = require('../utils/stateMachine');
 const crypto = require('crypto');
 const env = require('../config/env');
+const { calculateCashSettlement } = require('../services/cashSettlement');
+const { calculatePassengerCancellationFee } = require('../services/cancellationFee');
 
 const ACTIVE_STATUSES = ['solicitada', 'aceita', 'em_andamento'];
 
@@ -34,16 +36,36 @@ function assertFinancialSnapshot({ valor, ganho_motorista, ganho_app, percentual
 
 async function registrarLedgerCorrida(client, corrida, pagamentoId = null) {
   const valorRecebido = Number(corrida.valor_recebido_motorista ?? corrida.valor);
+  const acertoParcial = corrida.forma_pagamento === 'dinheiro' && valorRecebido < Number(corrida.valor)
+    ? calculateCashSettlement({ fare: corrida.valor, received: valorRecebido })
+    : null;
+  const valorBase = acertoParcial ? acertoParcial.fare : valorRecebido;
   const proporcaoRecebida = Number(corrida.valor) > 0 ? Math.min(1, Math.max(0, valorRecebido / Number(corrida.valor))) : 0;
-  const brutoRecebido = Number(valorRecebido.toFixed(2));
-  const repasseRecebido = Number((brutoRecebido * 0.85).toFixed(2));
-  const comissaoRecebida = Number((brutoRecebido - repasseRecebido).toFixed(2));
+  const brutoRecebido = Number(valorBase.toFixed(2));
+  const repasseRecebido = acertoParcial ? Number((Number(corrida.ganho_motorista) || (valorBase * 0.85)).toFixed(2)) : Number((brutoRecebido * 0.85).toFixed(2));
+  const comissaoRecebida = acertoParcial
+    ? acertoParcial.commissionAlreadyCoveredByCash
+    : Number((brutoRecebido - repasseRecebido).toFixed(2));
   if (brutoRecebido <= 0) return;
   const entries = [
-    { tipo: 'corrida_bruta', valor: brutoRecebido, ref: `corrida:${corrida.id}:bruta`, metadata: { papel: 'valor_bruto_recebido', status_pagamento: corrida.status_pagamento, valor_total_corrida: Number(corrida.valor) } },
-    { tipo: 'repasse_motorista', valor: -repasseRecebido, ref: `corrida:${corrida.id}:repasse`, metadata: { papel: 'repasse_motorista', percentual: 85, proporcao_recebida: proporcaoRecebida } },
-    { tipo: 'comissao_app', valor: -comissaoRecebida, ref: `corrida:${corrida.id}:comissao`, metadata: { papel: 'comissao_movi', percentual: 15, proporcao_recebida: proporcaoRecebida } },
+    { tipo: 'corrida_bruta', valor: brutoRecebido, ref: `corrida:${corrida.id}:bruta`, metadata: { papel: acertoParcial ? 'valor_bruto_contratado_com_debito' : 'valor_bruto_recebido', status_pagamento: corrida.status_pagamento, valor_total_corrida: Number(corrida.valor), valor_recebido: valorRecebido, debito_pendente: acertoParcial?.passengerDebt || 0 } },
+    { tipo: 'repasse_motorista', valor: -repasseRecebido, ref: `corrida:${corrida.id}:repasse`, metadata: { papel: 'ganho_economico_motorista', percentual: 85, proporcao_recebida: acertoParcial ? 1 : proporcaoRecebida, adiantamento_previsto: acertoParcial?.driverAdvance || 0, liquidacao: acertoParcial ? 'pendente' : 'registrada' } },
   ];
+  if (!acertoParcial || comissaoRecebida > 0) {
+    entries.push({
+      tipo: 'comissao_app',
+      valor: -comissaoRecebida,
+      ref: `corrida:${corrida.id}:comissao`,
+      metadata: {
+        papel: 'comissao_movi',
+        percentual: 15,
+        proporcao_recebida: acertoParcial ? comissaoRecebida / Math.max(0.01, acertoParcial.commissionTotal) : proporcaoRecebida,
+        liquidacao: acertoParcial ? 'parcial_coberta_no_dinheiro' : 'registrada',
+        comissao_total_corrida: acertoParcial?.commissionTotal ?? comissaoRecebida,
+        comissao_pendente_recuperacao: acertoParcial?.commissionAllocatedToDebt ?? 0,
+      },
+    });
+  }
 
   for (const entry of entries) {
     await client.query(`
@@ -115,7 +137,25 @@ async function criar(dados) {
 }
 
 async function buscarPorId(id) {
-  const { rows } = await pool.query('SELECT * FROM corridas WHERE id = $1 LIMIT 1', [id]);
+  const { rows } = await pool.query(`
+    SELECT c.*, t.valor AS taxa_cancelamento_valor, t.status AS taxa_cancelamento_status,
+           t.repasse_status AS taxa_cancelamento_repasse_status,
+           t.creditado_carteira_em AS taxa_cancelamento_creditado_carteira_em,
+           t.criado_em AS taxa_cancelamento_criada_em
+    FROM corridas c
+    LEFT JOIN movi_taxas_cancelamento t ON t.corrida_id = c.id
+    WHERE c.id = $1 LIMIT 1;
+  `, [id]);
+  if (rows[0] && rows[0].taxa_cancelamento_valor != null) {
+    rows[0].taxa_cancelamento = {
+      valor: Number(rows[0].taxa_cancelamento_valor),
+      status: rows[0].taxa_cancelamento_status,
+      repasse_status: rows[0].taxa_cancelamento_repasse_status,
+      creditado_carteira_em: rows[0].taxa_cancelamento_creditado_carteira_em,
+      criada_em: rows[0].taxa_cancelamento_criada_em,
+      destinatario: 'motorista',
+    };
+  }
   return rows[0];
 }
 
@@ -271,6 +311,63 @@ async function atualizarStatusControlado(id, nextStatus, actor) {
 
     assertRideTransition(current.status, nextStatus);
 
+    let taxaCancelamento = null;
+    if (nextStatus === 'cancelada' && actor.tipo === 'passageiro' && current.status === 'aceita' && current.motorista_id && current.aceita_em) {
+      const clock = await client.query('SELECT NOW() AS agora');
+      const fee = calculatePassengerCancellationFee({
+        actorType: actor.tipo,
+        priorStatus: current.status,
+        driverId: current.motorista_id,
+        acceptedAt: current.aceita_em,
+        cancelledAt: clock.rows[0]?.agora,
+      });
+      if (fee > 0) {
+        const passengerResult = await client.query('SELECT debito_pendente FROM passageiros WHERE id = $1 FOR UPDATE', [current.passageiro_id]);
+        if (!passengerResult.rows[0]) throw new AppError('Passageiro não encontrado.', 404, 'PASSENGER_NOT_FOUND');
+        const inserted = await client.query(`
+          INSERT INTO movi_taxas_cancelamento (
+            corrida_id, passageiro_id, motorista_id, valor, aceita_em, cancelada_em, segundos_apos_aceite,
+            repasse_status, creditado_carteira_em
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,'creditado_carteira',NOW())
+          ON CONFLICT (corrida_id) DO NOTHING
+          RETURNING id, corrida_id, passageiro_id, motorista_id, valor, status, repasse_status, creditado_carteira_em, criado_em;
+        `, [id, current.passageiro_id, current.motorista_id, fee, current.aceita_em, clock.rows[0].agora, Math.floor((new Date(clock.rows[0].agora).getTime() - new Date(current.aceita_em).getTime()) / 1000)]);
+        taxaCancelamento = inserted.rows[0] || null;
+        if (taxaCancelamento) {
+          const novoDebito = Number((Number(passengerResult.rows[0].debito_pendente || 0) + fee).toFixed(2));
+          await client.query('UPDATE passageiros SET debito_pendente = $1, atualizado_em = NOW() WHERE id = $2', [novoDebito, current.passageiro_id]);
+          const driverResult = await client.query('SELECT saldo_carteira FROM motoristas WHERE id = $1 FOR UPDATE', [current.motorista_id]);
+          const driver = driverResult.rows[0];
+          if (!driver) throw new AppError('Motorista não encontrado.', 404, 'DRIVER_NOT_FOUND');
+          const saldoAnterior = Number(driver.saldo_carteira || 0);
+          const saldoAtual = Number((saldoAnterior + fee).toFixed(2));
+          await client.query(`
+            UPDATE motoristas
+            SET saldo_carteira = $1, bloqueado_dinheiro = $2, atualizado_em = NOW()
+            WHERE id = $3;
+          `, [saldoAtual, deveBloquearCorridasEmDinheiro(saldoAtual), current.motorista_id]);
+          await client.query(`
+            INSERT INTO transacoes_motoristas (
+              motorista_id, corrida_id, tipo, valor, saldo_anterior, saldo_atual, referencia_externa, metadata
+            ) VALUES ($1,$2,'credito_taxa_cancelamento',$3,$4,$5,$6,$7::jsonb)
+            ON CONFLICT (referencia_externa) WHERE referencia_externa IS NOT NULL AND tipo = 'credito_taxa_cancelamento' DO NOTHING;
+          `, [current.motorista_id, id, fee, saldoAnterior, saldoAtual, `corrida:${id}:taxa_cancelamento:carteira`, JSON.stringify({ origem: 'cancelamento_passageiro', fonte: 'adiantamento_movi', status: 'creditado_carteira' })]);
+          const ledger = [
+            { tipo: 'taxa_cancelamento', valor: fee, referencia: `corrida:${id}:taxa_cancelamento:devida`, papel: 'debito_passageiro' },
+            { tipo: 'repasse_cancelamento', valor: -fee, referencia: `corrida:${id}:taxa_cancelamento:motorista`, papel: 'credito_motorista_carteira', status: 'creditado_carteira' },
+          ];
+          for (const entry of ledger) {
+            await client.query(`
+              INSERT INTO movi_lancamentos_financeiros (
+                corrida_id, motorista_id, passageiro_id, tipo, valor, moeda, referencia_unica, metadata
+              ) VALUES ($1,$2,$3,$4,$5,'BRL',$6,$7::jsonb)
+              ON CONFLICT (referencia_unica) WHERE referencia_unica IS NOT NULL DO NOTHING;
+            `, [id, current.motorista_id, current.passageiro_id, entry.tipo, entry.valor, entry.referencia, JSON.stringify({ papel: entry.papel, status: entry.status || 'pendente', destinatario: 'motorista' })]);
+          }
+        }
+      }
+    }
+
     const timestampColumn = nextStatus === 'em_andamento'
       ? 'iniciada_em'
       : nextStatus === 'cancelada'
@@ -280,10 +377,27 @@ async function atualizarStatusControlado(id, nextStatus, actor) {
       ? `, ${timestampColumn} = NOW()`
       : nextStatus === 'concluida' ? ', finalizada_em = NOW()' : '';
 
+    if (nextStatus === 'cancelada') {
+      // This project has no active payment provider yet. Close only local,
+      // unprocessed pending payment records; provider-backed payments need a
+      // real cancellation/refund round trip before their status can change.
+      await client.query(`
+        UPDATE movi_pagamentos
+        SET status = 'cancelado', atualizado_em = NOW()
+        WHERE corrida_id = $1 AND status = 'pendente' AND provider IS NULL;
+      `, [id]);
+    }
+
     const { rows } = await client.query(`
       UPDATE corridas
       SET
         status = $1::varchar ${extra},
+        status_pagamento = CASE
+          WHEN $1::varchar = 'cancelada' AND status_pagamento = 'pendente'
+            AND EXISTS (SELECT 1 FROM movi_pagamentos p WHERE p.corrida_id = $4::integer AND p.status = 'cancelado' AND p.provider IS NULL)
+          THEN 'cancelado'
+          ELSE status_pagamento
+        END,
         cancelada_por_tipo = CASE
           WHEN $1::varchar = 'cancelada' THEN $2::varchar
           ELSE cancelada_por_tipo
@@ -306,7 +420,9 @@ async function atualizarStatusControlado(id, nextStatus, actor) {
     }
 
     await client.query('COMMIT');
-    return rows[0];
+    return taxaCancelamento
+      ? { ...rows[0], taxa_cancelamento: { valor: Number(taxaCancelamento.valor), status: taxaCancelamento.status, repasse_status: taxaCancelamento.repasse_status, creditado_carteira_em: taxaCancelamento.creditado_carteira_em, criada_em: taxaCancelamento.criado_em, destinatario: 'motorista' } }
+      : rows[0];
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -406,7 +522,10 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       if (!driver) throw new AppError('Motorista não encontrado.', 404, 'DRIVER_NOT_FOUND');
       const saldoAnterior = Number(driver.saldo_carteira || 0);
       const valorRecebido = Number(recebido || 0);
-      const ganhoApp = Number((valorRecebido * 0.15).toFixed(2));
+      const acertoParcial = statusFinal === 'parcial' || statusFinal === 'nao_pago'
+        ? calculateCashSettlement({ fare: valorTotal, received: valorRecebido })
+        : null;
+      const ganhoApp = acertoParcial ? acertoParcial.commissionAlreadyCoveredByCash : Number((valorRecebido * 0.15).toFixed(2));
       const saldoAtual = Number((saldoAnterior - ganhoApp).toFixed(2));
       const bloqueado = deveBloquearCorridasEmDinheiro(saldoAtual);
 
@@ -442,6 +561,22 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
             VALUES ($1,$2,$3,$4,$5,$6)
           `, [corridaId, motoristaId, corrida.passageiro_id, valorTotal, valorRecebido, diferenca]);
         }
+
+        const acerto = calculateCashSettlement({ fare: valorTotal, received: valorRecebido });
+        await client.query(`
+          INSERT INTO movi_acertos_dinheiro (
+            corrida_id, passageiro_id, motorista_id, valor_total, valor_recebido, debito_passageiro,
+            comissao_total, comissao_alocada_ao_debito, comissao_coberta_no_dinheiro,
+            adiantamento_motorista, limite_protecao_nao_recuperavel, exposicao_protecao,
+            adiantamento_acima_protecao
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          ON CONFLICT (corrida_id) DO NOTHING;
+        `, [
+          corridaId, corrida.passageiro_id, motoristaId, acerto.fare, acerto.received, acerto.passengerDebt,
+          acerto.commissionTotal, acerto.commissionAllocatedToDebt, acerto.commissionAlreadyCoveredByCash,
+          acerto.driverAdvance, acerto.nonRecoverableProtectionCap, acerto.protectionExposure,
+          acerto.advanceAboveProtectionCap,
+        ]);
       }
     }
 
@@ -475,7 +610,23 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
     await registrarLedgerCorrida(client, finalizedRide, paymentResult.rows[0]?.id || null);
 
     await client.query('COMMIT');
-    return { sucesso: true, mensagem: 'Corrida finalizada e acertos financeiros computados.' };
+    const acertoParcial = corrida.forma_pagamento === 'dinheiro' && (statusFinal === 'parcial' || statusFinal === 'nao_pago')
+      ? calculateCashSettlement({ fare: valorTotal, received: Number(recebido || 0) })
+      : null;
+    return {
+      sucesso: true,
+      mensagem: 'Corrida finalizada e acertos financeiros computados.',
+      acerto_dinheiro: acertoParcial ? {
+        valor_recebido: acertoParcial.received,
+        debito_passageiro: acertoParcial.passengerDebt,
+        comissao_total: acertoParcial.commissionTotal,
+        comissao_coberta_no_dinheiro: acertoParcial.commissionAlreadyCoveredByCash,
+        adiantamento_motorista_previsto: acertoParcial.driverAdvance,
+        protecao_nao_recuperavel_maxima: acertoParcial.protectionExposure,
+        parcela_acima_do_teto_recuperavel: acertoParcial.advanceAboveProtectionCap,
+        liquidacao_ao_motorista: 'nao_integrada',
+      } : null,
+    };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -506,13 +657,15 @@ async function resumoParaUsuario({ tipo, id }) {
 async function listarParaUsuario({ tipo, id, limit = 20, offset = 0 }) {
   const coluna = tipo === 'motorista' ? 'motorista_id' : 'passageiro_id';
   const { rows } = await pool.query(`
-    SELECT id, origem, destino, valor,
-           CASE WHEN status = 'concluida' AND forma_pagamento = 'dinheiro'
-             THEN ROUND((ganho_motorista * COALESCE(valor_recebido_motorista, 0) / NULLIF(valor, 0))::numeric, 2)
-             ELSE ganho_motorista END AS ganho_motorista,
-           ganho_app, forma_pagamento, status, status_pagamento,
-           valor_recebido_motorista, criado_em, aceita_em, iniciada_em, finalizada_em, cancelada_em
-    FROM corridas WHERE ${coluna} = $1 ORDER BY criado_em DESC LIMIT $2 OFFSET $3;
+    SELECT c.id, c.origem, c.destino, c.valor,
+           CASE WHEN a.id IS NOT NULL THEN c.ganho_motorista
+             WHEN c.status = 'concluida' AND c.forma_pagamento = 'dinheiro'
+             THEN ROUND((c.ganho_motorista * COALESCE(c.valor_recebido_motorista, 0) / NULLIF(c.valor, 0))::numeric, 2)
+             ELSE c.ganho_motorista END AS ganho_motorista,
+           c.ganho_app, c.forma_pagamento, c.status, c.status_pagamento,
+           c.valor_recebido_motorista, c.criado_em, c.aceita_em, c.iniciada_em, c.finalizada_em, c.cancelada_em
+    FROM corridas c LEFT JOIN movi_acertos_dinheiro a ON a.corrida_id = c.id
+    WHERE c.${coluna} = $1 ORDER BY c.criado_em DESC LIMIT $2 OFFSET $3;
   `, [id, limit, offset]);
   return rows;
 }

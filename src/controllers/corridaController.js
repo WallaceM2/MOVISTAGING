@@ -52,7 +52,7 @@ function corridaParaPassageiroComCodigo(corrida) {
 
 async function estimar(req, res) {
   const { origem_lat, origem_lng, destino_lat, destino_lng, categoria, forma_pagamento } = req.body;
-  if (forma_pagamento && forma_pagamento !== 'dinheiro' && envConfig.PAYMENT_PROVIDER === 'none') {
+  if (forma_pagamento && forma_pagamento !== 'dinheiro' && (!envConfig.MP_CHECKOUT_ENABLED || envConfig.PAYMENT_PROVIDER === 'none')) {
     throw new AppError('Esta forma de pagamento ainda não está habilitada neste ambiente.', 409, 'PAYMENT_PROVIDER_REQUIRED');
   }
   const multiplicador = await calcularMultiplicador(origem_lat, origem_lng, categoria);
@@ -63,7 +63,7 @@ async function estimar(req, res) {
 async function solicitarCorrida(req, res) {
   const { origem, destino, origem_lat, origem_lng, destino_lat, destino_lng, categoria, forma_pagamento } = req.body;
   const passageiro_id = req.usuario.id;
-  if (forma_pagamento !== 'dinheiro' && envConfig.PAYMENT_PROVIDER === 'none') {
+  if (forma_pagamento !== 'dinheiro' && (!envConfig.MP_CHECKOUT_ENABLED || envConfig.PAYMENT_PROVIDER === 'none')) {
     throw new AppError('Esta forma de pagamento ainda não está habilitada neste ambiente.', 409, 'PAYMENT_PROVIDER_REQUIRED');
   }
   await registrarDemanda(origem_lat, origem_lng, passageiro_id, categoria);
@@ -168,7 +168,7 @@ async function cancelarCorrida(req, res) {
   const outroId = req.usuario.tipo === 'passageiro' ? corrida.motorista_id : corrida.passageiro_id;
   const corridaSegura = removerCodigoEmbarque(corrida);
   if (outroId) await emitToUser(outroTipo, outroId, 'corrida_cancelada', { corrida_id: corrida.id, corrida: corridaSegura });
-  res.json({ mensagem: 'Corrida cancelada com sucesso.', corrida: corridaSegura });
+  res.json({ mensagem: 'Corrida cancelada com sucesso.', corrida: corridaSegura, taxa_cancelamento: corrida.taxa_cancelamento || null });
 }
 
 async function verCorrida(req, res) {

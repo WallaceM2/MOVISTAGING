@@ -311,6 +311,20 @@ const env = Object.freeze({
   PAYMENT_PROVIDER:
     process.env.PAYMENT_PROVIDER || 'none',
 
+  // Mercado Pago marketplace OAuth/Payments. These remain optional until a
+  // sandbox rollout is explicitly configured; never use the platform token
+  // in place of a seller OAuth token for split payments.
+  MP_APP_ID: process.env.MP_APP_ID || '',
+  MP_CLIENT_SECRET: process.env.MP_CLIENT_SECRET || '',
+  MP_REDIRECT_URI: process.env.MP_REDIRECT_URI || '',
+  MP_WEBHOOK_SECRET: process.env.MP_WEBHOOK_SECRET || '',
+  MP_TOKEN_ENCRYPTION_KEY: process.env.MP_TOKEN_ENCRYPTION_KEY || '',
+  MP_ENVIRONMENT: process.env.MP_ENVIRONMENT || 'sandbox',
+  MP_WEBHOOK_URL: process.env.MP_WEBHOOK_URL || '',
+  // Hard gate: no environment flag can turn checkout on before the end-to-end
+  // payment, fee schedule, refund and mobile tokenization flows are complete.
+  MP_CHECKOUT_ENABLED: false,
+
   SHARE_PUBLIC_BASE_URL:
     process.env.SHARE_PUBLIC_BASE_URL || '',
 

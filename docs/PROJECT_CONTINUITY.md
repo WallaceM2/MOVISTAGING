@@ -1,6 +1,25 @@
 # MOVI — continuidade do trabalho
 
-Última atualização: 11 de outubro de 2026.
+## Atualização de 13 de outubro de 2026
+
+- Migration `013_passenger_cancellation_fee.sql` aplicada no PostgreSQL de desenvolvimento. O runner confirmou que não há migrations pendentes; `db:check` passou com 14 migrations e `ok: true`.
+- Cancelamento pelo passageiro após 180 segundos do aceite registra débito de R$ 3,00 e crédito imediato na carteira interna do motorista, em transação atômica e idempotente. O débito permanece devido à MOVI; contestação não reverte o crédito automaticamente.
+- V3: `npm run test:all` passou com 41 testes, análise sintática e verificações de segurança. PSG e MTA passaram no typecheck e nos testes de contrato do suporte.
+- PSG e MTA receberam a tela de suporte integrada ao V3. A tela do motorista recebe em tempo real o evento de cancelamento e exibe o crédito na carteira.
+- Pagamentos digitais continuam desabilitados (`PAYMENT_PROVIDER=none`). Builds release/validação visual dos AVDs ainda precisam ser repetidos quando o problema de caminho longo do CMake e a configuração de assinatura forem resolvidos.
+
+## Atualização de 12 de outubro de 2026
+
+- PSG e MTA agora têm uma tela de Ajuda e Suporte integrada aos endpoints existentes do V3: triagem de perguntas rápidas, FAQ, abertura e acompanhamento de chamados e envio de mensagens.
+- O prazo exibido é de 24–48 horas para a primeira resposta humana; a tela esclarece que isso não é uma promessa de resolução. A ajuda rápida não modifica conta, corrida ou pagamento; casos de segurança orientam a procurar emergência em risco imediato e oferecem encaminhamento humano.
+- Chamados são vinculados à conta autenticada; se for informado um número de corrida, o V3 valida a participação do solicitante. A versão atual aceita mensagens de texto, sem anexos.
+- Typecheck PSG e MTA passou após a integração. A última suíte automatizada conhecida passou em V3 (33 testes) e PSG (12 testes); os testes completos de corrida permanecem planejados para a etapa final, conforme definido pelo usuário.
+- Builds release e instalação nos AVDs foram interrompidos para reduzir carga do computador. PSG release continua com falha de caminho longo do CMake no Windows; a integração de suporte nos apps ainda não passou por validação visual/AVD.
+- Provedor de pagamento e bateria completa de testes E2E permanecem para a etapa final. Nenhum agente de matching, preço dinâmico, roteamento, previsão de demanda ou clima/eventos foi implementado ainda; são expansões posteriores ao núcleo operacional.
+
+Próximo passo imediato: validar visualmente a tela de suporte nos AVDs quando o computador estiver disponível; depois avançar os demais fluxos operacionais e a documentação de lançamento sem habilitar pagamentos digitais.
+
+Última atualização: 12 de outubro de 2026.
 
 ## Objetivo do produto
 

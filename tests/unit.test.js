@@ -5,12 +5,14 @@ const { assertRideTransition } = require('../src/utils/stateMachine');
 const { regrasPreco } = require('../src/services/mapsService');
 const { dateOfBirth } = require('../src/validators/commonValidator');
 const { parsePagination, parseExpiresIn } = require('../src/utils/pagination');
-const { cadastroPassageiroSchema } = require('../src/validators/passageiroValidator');
+const { cadastroPassageiroSchema, respostaDebitoSchema } = require('../src/validators/passageiroValidator');
 const { cadastroMotoristaSchema } = require('../src/validators/motoristaValidator');
 const { signAccessToken, createRefreshToken, hashToken } = require('../src/services/tokenService');
 const { verifyAccessToken } = require('../src/services/authService');
 const supportKnowledge = require('../src/services/supportKnowledgeService');
 const supportValidators = require('../src/validators/supportValidator');
+const { calculateCashSettlement } = require('../src/services/cashSettlement');
+const { calculatePassengerCancellationFee, CANCELLATION_FEE_BRL, CANCELLATION_FEE_DELAY_MS } = require('../src/services/cancellationFee');
 const crypto = require('crypto');
 
 
@@ -47,6 +49,168 @@ test('máquina de estados de corrida', () => {
   assert.throws(() => assertRideTransition('em_andamento', 'cancelada'), /Transição de corrida inválida/);
   assert.throws(() => assertRideTransition('concluida', 'em_andamento'), /Transição de corrida inválida/);
   assert.throws(() => assertRideTransition('cancelada', 'aceita'), /Transição de corrida inválida/);
+});
+
+test('taxa de cancelamento só vale após 180s do aceite e por cancelamento do passageiro', () => {
+  const acceptedAt = '2026-10-13T12:00:00.000Z';
+  const accepted = { actorType: 'passageiro', priorStatus: 'aceita', driverId: 8, acceptedAt };
+  assert.equal(CANCELLATION_FEE_BRL, 3);
+  assert.equal(CANCELLATION_FEE_DELAY_MS, 180000);
+  assert.equal(calculatePassengerCancellationFee({ ...accepted, cancelledAt: '2026-10-13T12:02:59.999Z' }), 0);
+  assert.equal(calculatePassengerCancellationFee({ ...accepted, cancelledAt: '2026-10-13T12:03:00.000Z' }), 3);
+  assert.equal(calculatePassengerCancellationFee({ ...accepted, actorType: 'motorista', cancelledAt: '2026-10-13T12:10:00.000Z' }), 0);
+  assert.equal(calculatePassengerCancellationFee({ ...accepted, priorStatus: 'solicitada', cancelledAt: '2026-10-13T12:10:00.000Z' }), 0);
+  assert.equal(calculatePassengerCancellationFee({ ...accepted, driverId: null, cancelledAt: '2026-10-13T12:10:00.000Z' }), 0);
+});
+
+test('cancelamento aceito após 180s registra débito e crédito de carteira ao motorista atomicamente', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const modelPath = require.resolve('../src/models/Corrida');
+  const originalDatabase = require.cache[databasePath];
+  const originalModel = require.cache[modelPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (sql === 'SELECT * FROM corridas WHERE id = $1::integer FOR UPDATE') return { rows: [{ id: 91, passageiro_id: 7, motorista_id: 8, status: 'aceita', aceita_em: '2026-10-13T12:00:00.000Z' }] };
+      if (sql === 'SELECT NOW() AS agora') return { rows: [{ agora: '2026-10-13T12:03:00.000Z' }] };
+      if (/SELECT debito_pendente FROM passageiros/.test(sql)) return { rows: [{ debito_pendente: '2.00' }] };
+      if (/INSERT INTO movi_taxas_cancelamento/.test(sql)) return { rows: [{ id: 6, corrida_id: 91, valor: '3.00', status: 'pendente', repasse_status: 'creditado_carteira', creditado_carteira_em: '2026-10-13T12:03:00.000Z', criado_em: '2026-10-13T12:03:00.000Z' }] };
+      if (/SELECT saldo_carteira FROM motoristas/.test(sql)) return { rows: [{ saldo_carteira: '-10.00' }] };
+      if (/UPDATE corridas/.test(sql)) return { rows: [{ id: 91, status: 'cancelada' }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client, query: async () => ({ rows: [] }) } };
+  delete require.cache[modelPath];
+  try {
+    const Corrida = require('../src/models/Corrida');
+    const result = await Corrida.atualizarStatusControlado(91, 'cancelada', { tipo: 'passageiro', id: 7 });
+    assert.equal(result.taxa_cancelamento.valor, 3);
+    assert.equal(result.taxa_cancelamento.destinatario, 'motorista');
+    assert.equal(result.taxa_cancelamento.repasse_status, 'creditado_carteira');
+    assert.equal(calls.filter(({ sql }) => /INSERT INTO movi_taxas_cancelamento/.test(sql)).length, 1);
+    const ledger = calls.filter(({ sql }) => /INSERT INTO movi_lancamentos_financeiros/.test(sql));
+    assert.equal(ledger.length, 2);
+    assert.deepEqual(ledger.map(({ values }) => [values[3], values[4], values[5]]), [
+      ['taxa_cancelamento', 3, 'corrida:91:taxa_cancelamento:devida'],
+      ['repasse_cancelamento', -3, 'corrida:91:taxa_cancelamento:motorista'],
+    ]);
+    const walletUpdate = calls.find(({ sql }) => /UPDATE motoristas[\s\S]*SET saldo_carteira/.test(sql));
+    assert.deepEqual(walletUpdate.values, [ -7, false, 8 ]);
+    const walletCredit = calls.find(({ sql }) => /INSERT INTO transacoes_motoristas/.test(sql));
+    assert.deepEqual(walletCredit.values.slice(0, 6), [8, 91, 3, -10, -7, 'corrida:91:taxa_cancelamento:carteira']);
+    assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
+    assert.equal(calls.some(({ sql }) => /UPDATE passageiros/.test(sql)), true);
+    assert.equal(calls.some(({ sql }) => /UPDATE movi_pagamentos[\s\S]*status = 'cancelado'/.test(sql)), true);
+  } finally {
+    if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
+});
+
+test('contestação de taxa de cancelamento abre chamado sem baixar o débito', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const modelPath = require.resolve('../src/models/CashDebt');
+  const originalDatabase = require.cache[databasePath];
+  const originalModel = require.cache[modelPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT t\.\*, c\.id AS ride_id/.test(sql)) return { rows: [{ id: 12, corrida_id: 91, passageiro_id: 7, status: 'pendente' }] };
+      if (/INSERT INTO movi_suporte_chamados/.test(sql)) return { rows: [{ id: 701, resposta_prevista_min_em: '2026-10-14', resposta_prevista_max_em: '2026-10-15' }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client, query: async () => ({ rows: [] }) } };
+  delete require.cache[modelPath];
+  try {
+    const CashDebt = require('../src/models/CashDebt');
+    const result = await CashDebt.contestarTaxaCancelamento({ corridaId: 91, passageiroId: 7, descricao: 'Discordo da cobrança porque o horário do aceite está incorreto.' });
+    assert.equal(result.status, 'contestada');
+    assert.equal(result.suporte_chamado_id, 701);
+    assert.equal(result.debito_preservado, true);
+    assert.equal(calls.some(({ sql }) => /UPDATE passageiros/.test(sql)), false);
+    assert.equal(calls.some(({ sql }) => /SET status = 'contestada'/.test(sql)), true);
+    assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
+  } finally {
+    if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
+});
+
+test('resposta de débito aceita confirmação sem saldo e exige relato para contestação', () => {
+  assert.deepEqual(respostaDebitoSchema.parse({ decisao: 'confirmar' }), { decisao: 'confirmar' });
+  assert.equal(respostaDebitoSchema.safeParse({ decisao: 'contestar', descricao: 'Discordo do valor apresentado nesta corrida.' }).success, true);
+  assert.equal(respostaDebitoSchema.safeParse({ decisao: 'contestar', descricao: 'Discordo.' }).success, false);
+  assert.equal(respostaDebitoSchema.safeParse({ decisao: 'confirmar', valor: 30 }).success, false);
+  assert.equal(respostaDebitoSchema.safeParse({ decisao: 'pagar' }).success, false);
+});
+
+test('contestação de dívida cria chamado e resposta na mesma transação, sem alterar saldo', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const modelPath = require.resolve('../src/models/CashDebt');
+  const originalDatabase = require.cache[databasePath];
+  const originalModel = require.cache[modelPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT o\.\*,\s*c\.forma_pagamento/.test(sql)) return { rows: [{ id: 71, corrida_id: 73, passageiro_id: 7, forma_pagamento: 'dinheiro', status: 'aberta', resposta_passageiro: 'pendente', diferenca_debito: '30.00', prazo_expirado: false }] };
+      if (/INSERT INTO movi_suporte_chamados/.test(sql)) return { rows: [{ id: 501 }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client } };
+  delete require.cache[modelPath];
+  try {
+    const CashDebt = require('../src/models/CashDebt');
+    const result = await CashDebt.responder({ corridaId: 73, passageiroId: 7, decisao: 'contestar', descricao: 'Discordo do valor; paguei a diferença por Pix ao motorista.' });
+    assert.equal(result.suporte_chamado_id, 501);
+    assert.equal(result.resposta_passageiro, 'contestada');
+    assert.equal(result.saldo_alterado, false);
+    assert.deepEqual(calls.find(({ sql }) => /INSERT INTO movi_suporte_mensagens/.test(sql)).values, [501, 7, 'Discordo do valor; paguei a diferença por Pix ao motorista.']);
+    assert.equal(calls.filter(({ sql }) => /INSERT INTO movi_suporte_chamados|INSERT INTO movi_suporte_mensagens|UPDATE ocorrencias_pagamento/.test(sql)).length, 3);
+    assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
+    assert.equal(calls.some(({ sql }) => /UPDATE passageiros/.test(sql)), false);
+  } finally {
+    if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
+});
+
+test('prazo expirado não transforma silêncio em confirmação de dívida', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const modelPath = require.resolve('../src/models/CashDebt');
+  const originalDatabase = require.cache[databasePath];
+  const originalModel = require.cache[modelPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT o\.\*,\s*c\.forma_pagamento/.test(sql)) return { rows: [{ id: 72, corrida_id: 74, passageiro_id: 8, forma_pagamento: 'dinheiro', status: 'aberta', resposta_passageiro: 'pendente', diferenca_debito: '15.00', prazo_expirado: true }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client } };
+  delete require.cache[modelPath];
+  try {
+    const CashDebt = require('../src/models/CashDebt');
+    const result = await CashDebt.responder({ corridaId: 74, passageiroId: 8, decisao: 'confirmar' });
+    assert.equal(result.resposta_passageiro, 'prazo_esgotado');
+    assert.equal(result.confirmacao_registrada, false);
+    assert.ok(calls.some(({ sql }) => /SET resposta_passageiro = 'prazo_esgotado'/.test(sql)));
+    assert.equal(calls.some(({ sql }) => /INSERT INTO movi_suporte_chamados|INSERT INTO movi_audit_logs|UPDATE passageiros/.test(sql)), false);
+    assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
+  } finally {
+    if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
 });
 
 test('regras de tarifa são finitas e configuradas', () => {
@@ -322,7 +486,28 @@ test('regras de limite financeiro bloqueiam passageiro em R$10 e dinheiro do mot
   assert.equal(Corrida.deveBloquearCorridasEmDinheiro(-10.01), true);
 });
 
-test('corrida em dinheiro parcial cobra comissão e credita ganho apenas sobre o recebido', async () => {
+test('acerto parcial em dinheiro separa comissão única, adiantamento e teto de proteção', () => {
+  assert.deepEqual(calculateCashSettlement({ fare: 40, received: 10 }), {
+    fare: 40,
+    received: 10,
+    passengerDebt: 30,
+    commissionTotal: 6,
+    commissionAllocatedToDebt: 6,
+    commissionAlreadyCoveredByCash: 0,
+    driverAdvance: 24,
+    nonRecoverableProtectionCap: 20,
+    protectionExposure: 20,
+    advanceAboveProtectionCap: 4,
+  });
+
+  const edge = calculateCashSettlement({ fare: 100, received: 95 });
+  assert.equal(edge.passengerDebt, 5);
+  assert.equal(edge.commissionAlreadyCoveredByCash, 10);
+  assert.equal(edge.commissionAllocatedToDebt, 5);
+  assert.equal(edge.driverAdvance, 0);
+});
+
+test('corrida em dinheiro parcial registra comissão única e exposição sem duplicar a taxa no saldo', async () => {
   const databasePath = require.resolve('../src/config/database');
   const corridaPath = require.resolve('../src/models/Corrida');
   const originalDatabase = require.cache[databasePath];
@@ -353,11 +538,14 @@ test('corrida em dinheiro parcial cobra comissão e credita ganho apenas sobre o
     const debtUpdate = calls.find(({ sql }) => /UPDATE passageiros SET debito_pendente/.test(sql));
     const ledgerEntries = calls.filter(({ sql }) => /INSERT INTO movi_lancamentos_financeiros/.test(sql));
     assert.equal(result.sucesso, true);
-    assert.deepEqual(walletUpdate.values, [-6, false, 42]);
+    assert.deepEqual(walletUpdate.values, [0, false, 42]);
     assert.deepEqual(debtUpdate.values, [60, 9]);
     assert.deepEqual(ledgerEntries.map(({ values }) => [values[4], values[5]]), [
-      ['corrida_bruta', 40], ['repasse_motorista', -34], ['comissao_app', -6],
+      ['corrida_bruta', 100], ['repasse_motorista', -85],
     ]);
+    const settlement = calls.find(({ sql }) => /INSERT INTO movi_acertos_dinheiro/.test(sql));
+    assert.ok(settlement);
+    assert.deepEqual(settlement.values.slice(3), [100, 40, 60, 15, 15, 0, 45, 20, 20, 25]);
   } finally {
     if (originalCorrida) require.cache[corridaPath] = originalCorrida;
     else delete require.cache[corridaPath];

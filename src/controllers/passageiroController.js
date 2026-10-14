@@ -7,6 +7,7 @@ const { parsePagination } = require('../utils/pagination');
 const { sanitizeIp, safeUserAgent } = require('../utils/http');
 const pool = require('../config/database');
 const { registrarAceites, currentRequiredDocuments } = require('../services/legalConsentService');
+const CashDebt = require('../models/CashDebt');
 
 async function cadastrar(req, res) {
   const body = { ...req.body, email: normalizeEmail(req.body.email), cpf: normalizeCpf(req.body.cpf), telefone: normalizePhone(req.body.telefone) };
@@ -111,4 +112,27 @@ async function quitarDebito(req, res) {
   }
 }
 
-module.exports = { cadastrar, listar, login, perfil, uploadDocumentos, quitarDebito };
+async function listarDebitos(req, res) {
+  res.json(await CashDebt.listarPorPassageiro(req.usuario.id));
+}
+
+async function responderDebito(req, res) {
+  const resultado = await CashDebt.responder({
+    corridaId: req.params.corridaId,
+    passageiroId: req.usuario.id,
+    decisao: req.body.decisao,
+    descricao: req.body.descricao,
+  });
+  res.json({ mensagem: 'Resposta registrada.', ...resultado });
+}
+
+async function contestarTaxaCancelamento(req, res) {
+  const resultado = await CashDebt.contestarTaxaCancelamento({
+    corridaId: req.params.corridaId,
+    passageiroId: req.usuario.id,
+    descricao: req.body.descricao,
+  });
+  res.json({ mensagem: 'Contestação encaminhada ao suporte MOVI.', ...resultado });
+}
+
+module.exports = { cadastrar, listar, login, perfil, uploadDocumentos, quitarDebito, listarDebitos, responderDebito, contestarTaxaCancelamento };
