@@ -28,7 +28,10 @@ export type Ride = RideOffer & {
   status_pagamento?: "pago" | "parcial" | "nao_pago" | "pendente";
   valor_recebido_motorista?: number | string | null;
   criado_em?: string;
+  aceita_em?: string;
+  cancelada_em?: string;
   finalizada_em?: string | null;
+  taxa_cancelamento?: { valor: number | string; status: 'pendente' | 'contestada' | 'liquidada' | 'cancelada'; repasse_status: 'creditado_carteira' | 'liquidado'; creditado_carteira_em: string; criada_em: string; destinatario: 'motorista' };
   passageiro?: {
     id: number;
     nome: string;
@@ -47,6 +50,17 @@ export type DriverStatement = {
   valor_total_corridas: string;
   historico: Array<Pick<Ride, "id" | "origem" | "destino" | "valor" | "ganho_motorista" | "forma_pagamento" | "status" | "status_pagamento" | "criado_em" | "finalizada_em">>;
   pagina: { limit: number; offset: number };
+};
+
+export type CashSettlementSummary = {
+  valor_recebido: number;
+  debito_passageiro: number;
+  comissao_total: number;
+  comissao_coberta_no_dinheiro: number;
+  adiantamento_motorista_previsto: number;
+  protecao_nao_recuperavel_maxima: number;
+  parcela_acima_do_teto_recuperavel: number;
+  liquidacao_ao_motorista: "nao_integrada";
 };
 
 export async function getOffers() {
@@ -81,7 +95,7 @@ export function startRide(id: number, codigoEmbarque: string) {
 }
 
 export function finishRide(id: number, payment: { status_pagamento: "pago" | "parcial" | "nao_pago"; valor_recebido_motorista?: number; observacao_pagamento?: string }) {
-  return apiFetch<{ mensagem: string; corrida: Ride; financeiro: { sucesso: boolean } }>(`/api/corridas/${id}/finalizar`, {
+  return apiFetch<{ mensagem: string; corrida: Ride; financeiro: { sucesso: boolean; acerto_dinheiro: CashSettlementSummary | null } }>(`/api/corridas/${id}/finalizar`, {
     method: "POST",
     body: JSON.stringify(payment),
     idempotencyKey: idempotencyKey(`ride-${id}-finish`),

@@ -2,10 +2,13 @@ import { io, Socket } from "socket.io-client";
 import { API_URL } from "@/config/env";
 import { refreshAccessToken } from "@/api/http";
 import { useAuthStore } from "@/store/authStore";
-import type { RideOffer } from "@/features/corrida/corridaService";
+import type { Ride, RideOffer } from "@/features/corrida/corridaService";
 
 type DriverOfferEvent = { corrida_id: number; local_embarque: string; local_desembarque: string; valor_motorista: number | string; distancia_km: number | string; tempo_minutos: number | string; forma_pagamento: RideOffer["forma_pagamento"]; categoria: RideOffer["categoria"]; conta_verificada?: boolean; coordenadas?: { origem: { lat: number; lng: number }; destino: { lat: number; lng: number } }; tempo_para_aceitar?: number };
-type ServerEvents = { nova_oferta_corrida: (payload: DriverOfferEvent) => void };
+type ServerEvents = {
+  nova_oferta_corrida: (payload: DriverOfferEvent) => void;
+  corrida_cancelada: (payload: { corrida_id: number; corrida: Ride }) => void;
+};
 type Ack = { ok?: boolean; codigo?: string; erro?: string; disponivel?: boolean };
 type ClientEvents = {
   heartbeat: (ack?: (response: Ack) => void) => void;

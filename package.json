@@ -11,7 +11,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:support-contract": "node --test tests/support-service.contract.test.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.0",
