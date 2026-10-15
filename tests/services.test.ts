@@ -35,6 +35,7 @@ describe('integração de domínio de corrida', () => {
         valorPassageiro: 8.25,
         distanciaKm: 1.77,
         tempoMin: 6,
+        cotacao_token: 'signed-quote-test-token',
       },
     } as never);
 
@@ -53,7 +54,7 @@ describe('integração de domínio de corrida', () => {
       oferta_enviada: true,
     } as never);
 
-    const result = await requestRide(ride);
+    const result = await requestRide({ ...ride, cotacao_token: 'signed-quote-test-token' });
     expect(result.corrida.id).toBe(7);
     const firstCall = apiFetchMock.mock.calls[0];
     const options = firstCall?.[1];
@@ -65,6 +66,7 @@ describe('integração de domínio de corrida', () => {
     ).toBeGreaterThanOrEqual(16);
 
     expect(firstCall?.[0]).toBe('/api/corridas/solicitar');
+    expect(JSON.parse(String(options?.body)).cotacao_token).toBe('signed-quote-test-token');
   });
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Share, StyleSheet, Text } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -14,10 +14,35 @@ import { brl, km, minutes } from '@/utils/format';
 import type { Coordinates } from '@/types/api';
 import { colors } from '@/theme/colors';
 
+const RideTrackingMap = React.memo(function RideTrackingMap({ rideId, originLatitude, originLongitude, destinationLatitude, destinationLongitude }: {
+  rideId: number;
+  originLatitude: number | string;
+  originLongitude: number | string;
+  destinationLatitude: number | string;
+  destinationLongitude: number | string;
+}) {
+  const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
+  const lastMapUpdateAt = useRef(0);
+  const origin = useMemo(() => ({ lat: Number(originLatitude), lng: Number(originLongitude) }), [originLatitude, originLongitude]);
+  const destination = useMemo(() => ({ lat: Number(destinationLatitude), lng: Number(destinationLongitude) }), [destinationLatitude, destinationLongitude]);
+
+  useEffect(() => subscribeRideEvents({
+    motorista_em_movimento: (event) => {
+      if (event.corrida_id !== rideId || !Number.isFinite(event.lat) || !Number.isFinite(event.lng)) return;
+      const now = Date.now();
+      if (now - lastMapUpdateAt.current < 1500) return;
+      lastMapUpdateAt.current = now;
+      setDriverLocation({ lat: event.lat, lng: event.lng });
+    },
+  }), [rideId]);
+
+  return <MapViewCard center={driverLocation ?? origin} origin={origin} destination={destination} driver={driverLocation} height={360} />;
+});
+
 export default function RideStatusScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const rideId = Number(id);
-  const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
+  const [driverMovingRideId, setDriverMovingRideId] = useState<number | null>(null);
   const [sharing, setSharing] = useState(false);
   const query = useQuery({ queryKey: ['ride-active', rideId], queryFn: () => getRide(rideId), enabled: Number.isInteger(rideId) && rideId > 0, refetchInterval: (q) => rideRefetchInterval(q.state.data?.status) });
   const ride = query.data;
@@ -28,7 +53,7 @@ export default function RideStatusScreen() {
     corrida_iniciada: (event) => { if (event.id === rideId) queryClient.setQueryData(['ride-active', rideId], event); },
     corrida_finalizada: (event) => { if (event.corrida.id === rideId) queryClient.setQueryData(['ride-active', rideId], event.corrida); },
     corrida_cancelada: (event) => { if (event.corrida_id === rideId) queryClient.setQueryData(['ride-active', rideId], event.corrida); },
-    motorista_em_movimento: (event) => { if (event.corrida_id === rideId) setDriverLocation({ lat: event.lat, lng: event.lng }); },
+    motorista_em_movimento: (event) => { if (event.corrida_id === rideId) setDriverMovingRideId(rideId); },
   }), [rideId]);
 
   async function onCancel() {
@@ -39,8 +64,8 @@ export default function RideStatusScreen() {
       'Cancelar corrida?',
       acceptedRide
         ? feeWindowElapsed
-          ? 'Já passaram 3 minutos desde o aceite. Se confirmar o cancelamento, será registrado um débito de R$ 3,00 e o valor será creditado imediatamente na carteira MOVI do motorista. O servidor confirma o tempo e o débito continua em aberto até a quitação.'
-          : 'Ainda não passaram 3 minutos desde o aceite, pelo horário deste aparelho. O servidor valida o tempo exato no momento do cancelamento; se o limite tiver sido atingido, será registrado um débito de R$ 3,00 e creditado na carteira MOVI do motorista.'
+          ? 'Já passaram 180 segundos desde o aceite. Se confirmar, será registrado um débito de R$ 3,00 e o valor será creditado na carteira MOVI do motorista. O servidor confirma o tempo; o débito continua em aberto até a quitação.'
+          : 'Ainda não passaram 180 segundos desde o aceite, pelo horário deste aparelho. O servidor valida o tempo exato; se o limite tiver sido atingido, será registrado um débito de R$ 3,00 e creditado na carteira MOVI do motorista.'
         : 'Como nenhum motorista aceitou a corrida, não será aplicada taxa de cancelamento.',
       [
         { text: 'Continuar corrida', style: 'cancel' },
@@ -70,15 +95,12 @@ export default function RideStatusScreen() {
   if (query.isError || !ride) return <Screen title="Sua corrida"><Text>Não foi possível carregar esta corrida.</Text><Button title="Voltar ao início" onPress={() => router.replace('/(app)/home')} /></Screen>;
   const copy = rideStatusCopy(ride.status);
   const terminal = isTerminalRide(ride.status);
-  const origin: Coordinates = { lat: Number(ride.origem_lat), lng: Number(ride.origem_lng) };
-  const destination: Coordinates = { lat: Number(ride.destino_lat), lng: Number(ride.destino_lng) };
-
   return <Screen title="Sua corrida" scroll={terminal ? true : false}>
-    {!terminal ? <MapViewCard center={driverLocation ?? origin} origin={origin} destination={destination} driver={driverLocation} height={360} /> : null}
+    {!terminal ? <RideTrackingMap key={rideId} rideId={rideId} originLatitude={ride.origem_lat} originLongitude={ride.origem_lng} destinationLatitude={ride.destino_lat} destinationLongitude={ride.destino_lng} /> : null}
     <Card>
       <Text style={styles.status}>{copy.title}</Text>
       <Text style={styles.subtitle}>{copy.description}</Text>
-      {driverLocation ? <Text style={styles.live}>● Motorista em movimento</Text> : null}
+      {driverMovingRideId === rideId ? <Text style={styles.live}>● Motorista em movimento</Text> : null}
       <Text style={styles.value}>{brl(ride.valor)}</Text>
       <Text style={styles.meta}>{km(ride.distancia_km)} • {minutes(ride.tempo_minutos)} • {ride.categoria === 'moto' ? 'Moto' : 'Carro'}</Text>
       <Text style={styles.meta}>Pagamento: {ride.forma_pagamento}</Text>

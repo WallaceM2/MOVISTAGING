@@ -48,6 +48,7 @@ export type PaymentMethod = 'dinheiro' | 'cartao' | 'pix';
 export type RideStatus = 'solicitada' | 'aceita' | 'em_andamento' | 'concluida' | 'cancelada' | 'expirada';
 
 export type Estimate = {
+  cotacao_token: string;
   tarifaId: number;
   tarifaVersao: number;
   tarifaSnapshot: Record<string, unknown>;
@@ -60,6 +61,8 @@ export type Estimate = {
   valorBaseCliente: number;
   valorDinamicaCliente: number;
   valorPassageiro: number;
+  debitoTaxaCancelamento?: number;
+  totalPassageiro?: number;
   ganhoMotorista: number;
   ganhoApp: number;
   percentualComissaoApp: number;
@@ -105,6 +108,7 @@ export type Ride = {
     placa?: string | null;
   } | null;
   solicitado_em?: string;
+  solicitada_em?: string;
   criado_em?: string;
   aceita_em?: string;
   iniciada_em?: string;

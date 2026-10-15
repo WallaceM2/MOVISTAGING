@@ -83,7 +83,7 @@ export default function DebtScreen() {
       return <Card key={`taxa-${fee.corrida_id}`}>
         <Text style={styles.rideTitle}>Taxa de cancelamento · Corrida #{fee.corrida_id}</Text>
         <Text style={styles.route}>{fee.origem} → {fee.destino}</Text>
-        <Text style={styles.meta}>R$ 3,00 aplicados porque o motorista aceitou e o cancelamento ocorreu após 180 segundos do aceite.</Text>
+        <Text style={styles.meta}>R$ 3,00 aplicados porque o motorista aceitou e o cancelamento ocorreu 180 segundos ou mais após o aceite.</Text>
         <Text style={styles.row}>Débito pendente <Text style={styles.amount}>{brl(fee.valor)}</Text></Text>
         <Text style={styles.note}>O MOVI já creditou R$ 3,00 na carteira interna do motorista. Esse crédito é um adiantamento da plataforma, não uma transferência bancária. Seu débito permanece em aberto até a quitação; contestar não o apaga nem reverte automaticamente o crédito.</Text>
         {fee.status === 'contestada' ? <Text style={styles.response}>Em análise · chamado #{fee.suporte_chamado_id ?? '—'} · primeira resposta prevista entre {date(fee.resposta_prevista_min_em)} e {date(fee.resposta_prevista_max_em)}.</Text> : <>

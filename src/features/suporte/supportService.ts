@@ -43,18 +43,18 @@ export function getSupportTicket(id: number) {
   return apiFetch<{ chamado: SupportTicket }>(`/api/suporte/chamados/${id}`);
 }
 
-export function createSupportTicket(input: { categoria: SupportCategory; assunto: string; mensagem: string; corrida_id?: number }) {
+export function createSupportTicket(input: { categoria: SupportCategory; assunto: string; mensagem: string; corrida_id?: number }, operationKey = createIdempotencyKey('support-ticket')) {
   return apiFetch<{ mensagem: string; chamado: SupportTicket; previsao_resposta_humana_horas: { minimo: number; maximo: number } }>('/api/suporte/chamados', {
     method: 'POST',
     body: JSON.stringify(input),
-    idempotencyKey: createIdempotencyKey('support-ticket'),
+    idempotencyKey: operationKey,
   });
 }
 
-export function sendSupportMessage(id: number, mensagem: string) {
+export function sendSupportMessage(id: number, mensagem: string, operationKey = createIdempotencyKey('support-message')) {
   return apiFetch<{ mensagem: string }>(`/api/suporte/chamados/${id}/mensagens`, {
     method: 'POST',
     body: JSON.stringify({ mensagem }),
-    idempotencyKey: createIdempotencyKey('support-message'),
+    idempotencyKey: operationKey,
   });
 }

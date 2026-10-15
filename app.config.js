@@ -1,6 +1,6 @@
 module.exports = ({ config }) => ({
   ...config,
-  name: 'MOVI Passageiro',
+  name: 'MOVI',
   slug: 'movi-passageiro',
   version: '1.0.0',
   orientation: 'portrait',

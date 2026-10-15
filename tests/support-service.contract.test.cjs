@@ -13,7 +13,7 @@ const httpMock = {
   },
 };
 const idempotencyMock = { createIdempotencyKey: (scope) => `${scope}-contract-test-key` };
-const source = fs.readFileSync(path.join(__dirname, '../src/features/suporte/supportService.ts'), 'utf8');
+const source = fs.readFileSync(path.join(process.cwd(), 'src/features/suporte/supportService.ts'), 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;

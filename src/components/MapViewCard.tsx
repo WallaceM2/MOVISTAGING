@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/config/env';
@@ -16,14 +16,18 @@ type Props = {
   height?: number;
 };
 
-function Marker({ kind }: { kind: 'origin' | 'destination' | 'driver' }) {
+const DEFAULT_CAMERA = { lat: -8.281, lng: -35.976 };
+const ROUTE_LINE_STYLE = { lineColor: '#111111', lineWidth: 5, lineCap: 'round', lineJoin: 'round' } as const;
+
+const Marker = React.memo(function Marker({ kind }: { kind: 'origin' | 'destination' | 'driver' }) {
   const label = kind === 'origin' ? 'A' : kind === 'destination' ? 'B' : 'M';
   return <View style={[styles.marker, kind === 'driver' ? styles.driverMarker : styles.pointMarker]}><Text style={styles.markerText}>{label}</Text></View>;
-}
+});
 
-export function MapViewCard({ center, origin, destination, driver, route, height = 430 }: Props) {
+export const MapViewCard = React.memo(function MapViewCard({ center, origin, destination, driver, route, height = 430 }: Props) {
+  const routeShape = useMemo(() => route ? { type: 'Feature' as const, properties: {}, geometry: route } : null, [route]);
   if (!MAPBOX_TOKEN) return <View style={[styles.fallback, { height }]}><Text style={styles.fallbackTitle}>Mapa aguardando configuração</Text><Text style={styles.fallbackText}>Defina EXPO_PUBLIC_MAPBOX_TOKEN com um token público pk...</Text></View>;
-  const camera = center ?? driver ?? origin ?? { lat: -8.281, lng: -35.976 };
+  const camera = center ?? driver ?? origin ?? DEFAULT_CAMERA;
   return (
     <View style={[styles.container, { height }]}>
       <Mapbox.MapView style={StyleSheet.absoluteFill} styleURL={Mapbox.StyleURL.Street} logoEnabled={false} compassEnabled>
@@ -32,11 +36,11 @@ export function MapViewCard({ center, origin, destination, driver, route, height
         {origin ? <Mapbox.PointAnnotation id="origin" coordinate={[origin.lng, origin.lat]}><Marker kind="origin" /></Mapbox.PointAnnotation> : null}
         {destination ? <Mapbox.PointAnnotation id="destination" coordinate={[destination.lng, destination.lat]}><Marker kind="destination" /></Mapbox.PointAnnotation> : null}
         {driver ? <Mapbox.PointAnnotation id="driver" coordinate={[driver.lng, driver.lat]}><Marker kind="driver" /></Mapbox.PointAnnotation> : null}
-        {route?.coordinates?.length ? <Mapbox.ShapeSource id="ride-route" shape={{ type: 'Feature', properties: {}, geometry: route }}><Mapbox.LineLayer id="ride-route-line" style={{ lineColor: '#111111', lineWidth: 5, lineCap: 'round', lineJoin: 'round' }} /></Mapbox.ShapeSource> : null}
+        {routeShape?.geometry.coordinates.length ? <Mapbox.ShapeSource id="ride-route" shape={routeShape}><Mapbox.LineLayer id="ride-route-line" style={ROUTE_LINE_STYLE} /></Mapbox.ShapeSource> : null}
       </Mapbox.MapView>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { overflow: 'hidden', borderRadius: radius.lg, backgroundColor: '#E5E7EB' },

@@ -20,6 +20,14 @@ export default function ConfirmarScreen() { const { payload } = useLocalSearchPa
     );
   }
 
+  const cotacaoToken = parsed.estimate?.cotacao_token;
+  if (!cotacaoToken) {
+    return Alert.alert(
+      'Cotação indisponível',
+      'Volte e atualize a estimativa antes de solicitar a corrida.',
+    );
+  }
+
   setLoading(true);
 
   try {
@@ -32,6 +40,7 @@ export default function ConfirmarScreen() { const { payload } = useLocalSearchPa
       destino_lng: parsed.destino_lng,
       categoria: parsed.categoria,
       forma_pagamento: parsed.forma_pagamento,
+      cotacao_token: cotacaoToken,
     });
 
     router.replace({
@@ -47,6 +56,6 @@ export default function ConfirmarScreen() { const { payload } = useLocalSearchPa
     setLoading(false);
   }
 }
-  return <Screen title="Confirmar corrida" subtitle="Confira os dados antes de solicitar.">{parsed ? <><MapViewCard center={{ lat: parsed.origem_lat, lng: parsed.origem_lng }} origin={{ lat: parsed.origem_lat, lng: parsed.origem_lng }} destination={{ lat: parsed.destino_lat, lng: parsed.destino_lng }} route={parsed.estimate?.geometria ?? null} height={290} /><Card><Text style={styles.label}>Origem</Text><Text style={styles.value}>{parsed.origem}</Text><Text style={styles.label}>Destino</Text><Text style={styles.value}>{parsed.destino}</Text><Text style={styles.label}>Categoria</Text><Text style={styles.value}>{parsed.categoria === 'moto' ? 'Moto' : 'Carro'}</Text><Text style={styles.label}>Pagamento</Text><Text style={styles.value}>{parsed.forma_pagamento}</Text>{parsed.estimate ? <><Text style={styles.label}>Distância / duração</Text><Text style={styles.value}>{km(parsed.estimate.distanciaKm)} • {minutes(parsed.estimate.tempoMin)}</Text><Text style={styles.price}>{brl(parsed.estimate.valorPassageiro)}</Text></> : null}</Card>{parsed.forma_pagamento === 'dinheiro' ? <Card><Text style={styles.cashNoticeTitle}>Pagamento em dinheiro</Text><Text style={styles.cashNotice}>Pague ao motorista e aguarde o encerramento da corrida no app. Se houver pagamento parcial ou divergência, o MOVI registrará o valor recebido e o saldo pendente. Não faça um segundo pagamento pelo app.</Text></Card> : null}<Button title="Solicitar corrida" onPress={() => void confirm()} loading={loading} /></> : <Text>Dados da corrida inválidos.</Text>}</Screen>;
+  return <Screen title="Confirmar corrida" subtitle="Confira os dados antes de solicitar.">{parsed ? <><MapViewCard center={{ lat: parsed.origem_lat, lng: parsed.origem_lng }} origin={{ lat: parsed.origem_lat, lng: parsed.origem_lng }} destination={{ lat: parsed.destino_lat, lng: parsed.destino_lng }} route={parsed.estimate?.geometria ?? null} height={290} /><Card><Text style={styles.label}>Origem</Text><Text style={styles.value}>{parsed.origem}</Text><Text style={styles.label}>Destino</Text><Text style={styles.value}>{parsed.destino}</Text><Text style={styles.label}>Categoria</Text><Text style={styles.value}>{parsed.categoria === 'moto' ? 'Moto' : 'Carro'}</Text><Text style={styles.label}>Pagamento</Text><Text style={styles.value}>{parsed.forma_pagamento}</Text>{parsed.estimate ? <><Text style={styles.label}>Distância / duração</Text><Text style={styles.value}>{km(parsed.estimate.distanciaKm)} • {minutes(parsed.estimate.tempoMin)}</Text>{Number(parsed.estimate.debitoTaxaCancelamento ?? 0) > 0 ? <><Text style={styles.label}>Tarifa da corrida</Text><Text style={styles.value}>{brl(parsed.estimate.valorPassageiro)}</Text><Text style={styles.label}>Débito anterior de cancelamento · MOVI</Text><Text style={styles.value}>{brl(parsed.estimate.debitoTaxaCancelamento)}</Text></> : null}<Text style={styles.price}>{brl(parsed.estimate.totalPassageiro ?? parsed.estimate.valorPassageiro)}</Text><Text style={styles.lockedQuote}>Preço final com dinâmica {parsed.estimate.dinamicaAplicada}. Este valor fica fixo ao solicitar.</Text></> : null}</Card>{parsed.forma_pagamento === 'dinheiro' ? <Card><Text style={styles.cashNoticeTitle}>Pagamento em dinheiro</Text><Text style={styles.cashNotice}>Pague ao motorista o total mostrado, incluindo eventual débito de cancelamento. Na finalização, o app registra separadamente a tarifa da viagem e a recuperação de débito destinada à MOVI. Não faça um segundo pagamento pelo app.</Text></Card> : null}<Button title="Solicitar corrida" onPress={() => void confirm()} loading={loading} /></> : <Text>Dados da corrida inválidos.</Text>}</Screen>;
 }
-const styles = StyleSheet.create({ label: { color: colors.muted, fontSize: 12, marginTop: 8 }, value: { color: colors.text, fontWeight: '800', fontSize: 16, marginBottom: 6 }, price: { fontSize: 30, fontWeight: '900', color: colors.text, marginTop: 14 }, cashNoticeTitle: { color: colors.text, fontWeight: '900', fontSize: 15, marginBottom: 6 }, cashNotice: { color: colors.muted, lineHeight: 20 } });
+const styles = StyleSheet.create({ label: { color: colors.muted, fontSize: 12, marginTop: 8 }, value: { color: colors.text, fontWeight: '800', fontSize: 16, marginBottom: 6 }, price: { fontSize: 30, fontWeight: '900', color: colors.text, marginTop: 14 }, lockedQuote: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 4 }, cashNoticeTitle: { color: colors.text, fontWeight: '900', fontSize: 15, marginBottom: 6 }, cashNotice: { color: colors.muted, lineHeight: 20 } });

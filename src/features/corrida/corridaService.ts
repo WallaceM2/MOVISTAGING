@@ -11,6 +11,7 @@ export type RideRequest = {
   destino_lng: number;
   categoria: RideCategory;
   forma_pagamento: PaymentMethod;
+  cotacao_token?: string;
 };
 
 export async function estimateRide(body: RideRequest) {
@@ -19,6 +20,7 @@ export async function estimateRide(body: RideRequest) {
 }
 
 export async function requestRide(body: RideRequest) {
+  if (!body.cotacao_token) throw new Error('A cotação expirou ou não está disponível. Faça uma nova estimativa.');
   const key = createIdempotencyKey('corrida-solicitar');
   return apiFetch<{ mensagem: string; corrida: Ride; detalhes_valores: Estimate; motoristas_encontrados: number; oferta_enviada: boolean }>('/api/corridas/solicitar', { method: 'POST', body: JSON.stringify(body), idempotencyKey: key });
 }
