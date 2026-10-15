@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#031017">
+    <meta name="description" content="Painel administrativo interno da MOVI">
+    <title>MOVI · Painel administrativo</title>
+    <link rel="stylesheet" href="/admin/styles.css">
+    <script src="/admin/app.js" defer></script>
+  </head>
+  <body>
+    <main id="login-view" class="login-wrap" hidden>
+      <section class="login-card" aria-labelledby="login-title">
+        <a class="brand-lockup brand-link" href="/admin/" aria-label="MOVI"><span class="movi-logo" data-movi-logo="full"></span></a>
+        <p class="eyebrow">ÁREA RESTRITA</p>
+        <h1 id="login-title">Painel administrativo</h1>
+        <p class="muted">Entre com uma conta administrativa da MOVI.</p>
+        <form id="login-form" class="login-form">
+          <label for="email">E-mail administrativo</label>
+          <input id="email" name="email" type="email" autocomplete="username" maxlength="320" required>
+          <label for="password">Senha</label>
+          <input id="password" name="senha" type="password" autocomplete="current-password" maxlength="128" required>
+          <p id="login-error" class="form-error" role="alert" hidden></p>
+          <button id="login-button" class="button button-primary" type="submit">Entrar no painel</button>
+        </form>
+        <p class="security-note">Acesso interno. Contas de passageiro e motorista não têm permissão administrativa.</p>
+      </section>
+    </main>
+
+    <div id="dashboard-view" class="app-shell" hidden>
+      <aside class="sidebar" id="sidebar">
+        <a class="brand-link" href="#visao-geral" aria-label="MOVI, início do painel"><span class="movi-logo" data-movi-logo="full"></span></a>
+        <div class="sidebar-user"><span class="avatar avatar-admin" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.2 20c.5-3.5 2.8-5.4 6.8-5.4s6.3 1.9 6.8 5.4"/></svg></span><span><strong id="admin-name">Admin MOVI</strong><small>Administrador</small></span><i class="status-dot" aria-label="Sessão ativa"></i></div>
+        <nav aria-label="Menu administrativo">
+          <a class="nav-item active" href="#visao-geral" aria-current="page"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Visão Geral</span></a>
+          <a class="nav-item" href="#corridas"><svg viewBox="0 0 24 24"><path d="m5 11 1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11l1.5 1.4V19h-2v-2H5.5v2h-2v-6.6z"/><path d="M6 11h12M7 14.5h.1m9.8 0h.1"/></svg><span>Corridas</span></a>
+          <span class="nav-item nav-item-unavailable" aria-disabled="true" title="A tela de gestão de motoristas ainda não faz parte deste painel"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Motoristas</span></span>
+          <a class="nav-item" href="#passageiros"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5.5a3 3 0 0 1 0 5.8M17 14a6 6 0 0 1 4.5 5.8"/></svg><span>Passageiros</span></a>
+          <a class="nav-item" href="#pagamentos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg><span>Pagamentos</span></a>
+          <details class="nav-group" open>
+            <summary class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.7-.8-1.7-1.2-3.1-1.2-1.6 0-2.7.8-2.7 2s1 1.7 2.9 2c1.8.3 2.8.9 2.8 2.1 0 1.3-1.2 2.2-3 2.2-1.4 0-2.6-.5-3.3-1.4M12 5.5v13"/></svg><span>Financeiro</span><b aria-hidden="true"></b></summary>
+            <div class="nav-submenu"><a href="#financeiro">Extrato</a><a href="#financeiro">Repasses</a><a href="#saques">Saques</a><a href="#financeiro">Conciliação</a><a href="#financeiro">Lançamentos</a><a href="#financeiro">Contas</a></div>
+          </details>
+          <a class="nav-item" href="#ocorrencias"><svg viewBox="0 0 24 24"><path d="m10.3 4.3-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-2.7l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg><span>Ocorrências</span></a>
+          <span class="nav-item nav-item-unavailable" aria-disabled="true" title="Ajustes financeiros ainda não estão habilitados no painel"><svg viewBox="0 0 24 24"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>Ajustes</span></span>
+          <span class="nav-item nav-item-unavailable" aria-disabled="true" title="Relatórios completos ainda não estão disponíveis"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-7"/></svg><span>Relatórios</span></span>
+          <span class="nav-item nav-item-unavailable" aria-disabled="true" title="Configurações administrativas ainda não estão disponíveis"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.5 2.6-1.7-.7a8 8 0 0 1-1.5.9l-.3 1.8h-3l-.3-1.8a8 8 0 0 1-1.5-.9l-1.7.7-1.5-2.6 1.4-1.1a7 7 0 0 1 0-1.8l-1.4-1.1 1.5-2.6 1.7.7a8 8 0 0 1 1.5-.9l.3-1.8h3l.3 1.8a8 8 0 0 1 1.5.9l1.7-.7 1.5 2.6-1.4 1.1a7 7 0 0 1-.1 1.7Z" transform="translate(-1 -1)"/></svg><span>Configurações</span></span>
+        </nav>
+        <div class="sidebar-brand-card"><span class="movi-logo" data-movi-logo="symbol"></span><strong>MOVI</strong><small>Mobilidade que gera oportunidades.</small></div>
+        <button id="logout-button" class="logout-button" type="button"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5m5 5H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg><span>Sair</span></button>
+      </aside>
+
+      <main class="main-content" id="visao-geral">
+        <header class="topbar">
+          <button id="menu-button" class="icon-button menu-button" type="button" aria-label="Abrir menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+          <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg><input id="global-search" type="search" placeholder="Buscar por corrida, motorista, passageiro, transação..." autocomplete="off" aria-label="Filtrar dados exibidos no painel"></label>
+          <div class="topbar-tools">
+            <button class="icon-button notification-button" type="button" aria-label="Ver ocorrências abertas"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i id="notification-count">0</i></button>
+            <span class="topbar-separator"></span><div class="clock-block"><span id="current-date">—</span><small id="current-time">—</small></div><span class="topbar-separator"></span>
+            <button id="profile-button" class="profile-button" type="button" aria-label="Sair da conta"><span class="avatar"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.2 20c.5-3.5 2.8-5.4 6.8-5.4s6.3 1.9 6.8 5.4"/></svg></span><svg class="chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+            <button id="refresh-button" class="icon-button refresh-button" type="button" aria-label="Atualizar painel" title="Atualizar"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.4-3"/></svg></button>
+          </div>
+        </header>
+
+        <div id="page-error" class="notice notice-error" role="alert" hidden></div>
+        <div id="loading-state" class="loading-state" role="status">Carregando dados operacionais…</div>
+
+        <section id="dashboard-content" hidden>
+          <div class="page-title-row"><div><h1>Painel Administrativo</h1><p class="subtitle">Visão geral financeira e operacional da MOVI</p></div><label class="period-select"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><select id="period-filter" aria-label="Período do painel"><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="today">Hoje</option><option value="month">Este mês</option></select><svg class="chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></label></div>
+          <div id="summary-grid" class="summary-grid" aria-live="polite"></div>
+          <div class="dashboard-grid">
+            <div class="dashboard-main-column">
+              <section class="panel chart-panel" id="financeiro" aria-labelledby="chart-title"><div class="panel-heading"><h2 id="chart-title"><svg class="heading-icon" viewBox="0 0 24 24"><path d="M3 18h3v3H3zM10 12h3v9h-3zM17 5h3v16h-3zM3 12l6-5 5 2 7-7"/></svg> Movimentação Financeira</h2><div id="chart-legend" class="chart-legend"></div></div><div id="finance-chart" class="finance-chart" role="img" aria-label="Gráfico de movimentação financeira"></div></section>
+              <section class="panel payment-panel" id="pagamentos" aria-labelledby="payment-title"><div class="panel-heading"><h2 id="payment-title"><svg class="heading-icon" viewBox="0 0 24 24"><path d="M4 8h16M7 5l-3 3 3 3M20 16H4m13-3 3 3-3 3"/></svg> Formas de Pagamento</h2></div><div class="payment-content"><div id="payment-donut" class="payment-donut"><div><small>Total em tarifas</small><strong id="payment-total">—</strong></div></div><div id="payment-legend" class="payment-legend"></div></div><p class="data-caption">Tarifas concluídas agrupadas pelo método informado. Não representa liquidação do provedor.</p></section>
+              <section class="panel table-panel rides-panel" id="corridas"><div class="panel-heading"><h2><svg class="heading-icon" viewBox="0 0 24 24"><path d="m5 11 1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11l1.5 1.4V19h-2v-2H5.5v2h-2v-6.6z"/><path d="M6 11h12M7 14.5h.1m9.8 0h.1"/></svg> Últimas Corridas</h2><a class="panel-link" href="#corridas">Ver todas</a></div><div class="table-scroll"><table id="corridas-table"><thead><tr><th>ID da corrida</th><th>Passageiro</th><th>Motorista</th><th>Categoria</th><th>Valor total</th><th>Status</th><th>Pagamento</th><th>Horário</th></tr></thead><tbody id="rides-body"></tbody></table></div><p id="empty-rides" class="empty-state" hidden>Nenhuma corrida registrada.</p></section>
+              <section class="panel table-panel debts-panel" id="passageiros"><div class="panel-heading"><h2><svg class="heading-icon danger-icon" viewBox="0 0 24 24"><path d="M12 3v18m7-14H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H5"/></svg> Débitos de Passageiros</h2><a class="panel-link" href="#passageiros">Ver todos</a></div><div class="table-scroll"><table><thead><tr><th>Passageiro</th><th>Valor em aberto</th><th>Qtd. corridas</th><th>Última ocorrência</th></tr></thead><tbody id="debts-body"></tbody></table></div><p id="empty-debts" class="empty-state" hidden>Nenhum débito pendente registrado.</p></section>
+              <section class="panel table-panel withdrawals-panel" id="saques"><div class="panel-heading"><h2><svg class="heading-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18m-5 4h2"/></svg> Saques e Transferências</h2><a class="panel-link" href="#saques">Ver todos</a></div><div class="table-scroll"><table><thead><tr><th>Motorista</th><th>Valor</th><th>Taxa</th><th>Recebido</th><th>Status</th><th>Solicitação</th></tr></thead><tbody id="withdrawals-body"></tbody></table></div><p id="empty-withdrawals" class="empty-state" hidden>Nenhum saque registrado.</p></section>
+              <section class="panel table-panel incidents-panel" id="ocorrencias"><div class="panel-heading"><h2><svg class="heading-icon danger-icon" viewBox="0 0 24 24"><path d="m10.3 4.3-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-2.7l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg> Ocorrências Financeiras</h2><a class="panel-link" href="#ocorrencias">Ver todas</a></div><div class="table-scroll"><table><thead><tr><th>ID</th><th>Tipo</th><th>Corrida</th><th>Valor</th><th>Status</th><th>Data</th></tr></thead><tbody id="incidents-body"></tbody></table></div><p id="empty-incidents" class="empty-state" hidden>Nenhuma ocorrência registrada.</p></section>
+            </div>
+            <aside class="dashboard-side-column">
+              <section class="panel activity-panel" id="atividade"><div class="panel-heading"><h2><svg class="heading-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Atividade Recente</h2><a class="panel-link" href="#atividade">Ver todas</a></div><div id="activity-list" class="activity-list"></div><p id="empty-activity" class="empty-state" hidden>Sem atividade recente.</p></section>
+              <section class="panel quick-actions" id="acoes-rapidas"><div class="panel-heading"><h2><svg class="heading-icon" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></svg> Ações Rápidas</h2></div><button id="generate-report" class="quick-action" type="button"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h4"/></svg> Gerar relatório</button><button class="quick-action quick-action-disabled" type="button" disabled title="Ajustes financeiros exigem fluxo administrativo e auditoria ainda não implementados"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></svg> Ajuste financeiro</button><a class="quick-action" href="#saques"><svg viewBox="0 0 24 24"><path d="M4 8h16M7 5l-3 3 3 3M20 16H4m13-3 3 3-3 3"/></svg> Gerenciar saques</a><a class="quick-action" href="#ocorrencias"><svg viewBox="0 0 24 24"><path d="m10.3 4.3-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-2.7l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg> Ver ocorrências</a><p class="data-caption">Atalhos para as seções disponíveis neste painel.</p></section>
+            </aside>
+          </div>
+          <p id="finance-note" class="data-caption footer-note"></p><footer class="page-footer">MOVI Admin <span>·</span> Dados servidos pelo backend V3 <span>·</span> <span id="updated-at">—</span></footer>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

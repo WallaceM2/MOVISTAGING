@@ -32,9 +32,19 @@ function decryptSecret(serialized) {
     throw new AppError('Credencial Mercado Pago armazenada em formato inválido.', 503, 'MP_STORED_CREDENTIAL_INVALID');
   }
   try {
-    const decipher = crypto.createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(ivEncoded, 'base64url'));
-    decipher.setAuthTag(Buffer.from(tagEncoded, 'base64url'));
-    return Buffer.concat([decipher.update(Buffer.from(bodyEncoded, 'base64url')), decipher.final()]).toString('utf8');
+    const decodeCanonicalBase64Url = (value) => {
+      if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url');
+      const decoded = Buffer.from(value, 'base64url');
+      if (decoded.toString('base64url') !== value) throw new Error('Non-canonical base64url');
+      return decoded;
+    };
+    const iv = decodeCanonicalBase64Url(ivEncoded);
+    const tag = decodeCanonicalBase64Url(tagEncoded);
+    const ciphertext = decodeCanonicalBase64Url(bodyEncoded);
+    if (iv.length !== 12 || tag.length !== 16 || ciphertext.length === 0) throw new Error('Invalid credential size');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getEncryptionKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
   } catch (_) {
     throw new AppError('Não foi possível desbloquear a credencial Mercado Pago.', 503, 'MP_CREDENTIAL_DECRYPTION_FAILED');
   }

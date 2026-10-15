@@ -11,7 +11,7 @@ const { signAccessToken, createRefreshToken, hashToken } = require('../src/servi
 const { verifyAccessToken } = require('../src/services/authService');
 const supportKnowledge = require('../src/services/supportKnowledgeService');
 const supportValidators = require('../src/validators/supportValidator');
-const { calculateCashSettlement } = require('../src/services/cashSettlement');
+const { calculateCashSettlement, calculateCashRideCollection } = require('../src/services/cashSettlement');
 const { calculatePassengerCancellationFee, CANCELLATION_FEE_BRL, CANCELLATION_FEE_DELAY_MS } = require('../src/services/cancellationFee');
 const crypto = require('crypto');
 
@@ -61,6 +61,13 @@ test('taxa de cancelamento só vale após 180s do aceite e por cancelamento do p
   assert.equal(calculatePassengerCancellationFee({ ...accepted, actorType: 'motorista', cancelledAt: '2026-10-13T12:10:00.000Z' }), 0);
   assert.equal(calculatePassengerCancellationFee({ ...accepted, priorStatus: 'solicitada', cancelledAt: '2026-10-13T12:10:00.000Z' }), 0);
   assert.equal(calculatePassengerCancellationFee({ ...accepted, driverId: null, cancelledAt: '2026-10-13T12:10:00.000Z' }), 0);
+});
+
+test('FAQ do suporte explica taxa após 180s do aceite, não da solicitação', () => {
+  const cancellationFaq = supportKnowledge.listArticles().find(({ id }) => id === 'cancelamento');
+  assert.ok(cancellationFaq);
+  assert.match(cancellationFaq.resposta, /180 segundos ou mais depois do aceite/);
+  assert.doesNotMatch(cancellationFaq.resposta, /depois da solicitação/);
 });
 
 test('cancelamento aceito após 180s registra débito e crédito de carteira ao motorista atomicamente', async () => {
@@ -403,7 +410,7 @@ test('extrato separa ganhos acumulados dos ganhos concluídos nas últimas 24 ho
     async query(sql, values) {
       statement = sql;
       parameters = values;
-      return { rows: [{ ganhos_motorista: '150.00', ganhos_ultimas_24h: '30.00', saldo_carteira: '-4.50' }] };
+      return { rows: [{ ganhos_motorista: '150.00', ganhos_ultimas_24h: '30.00', repasse_pendente: '24.00', saldo_carteira: '-4.50' }] };
     },
   } };
   delete require.cache[corridaPath];
@@ -416,8 +423,10 @@ test('extrato separa ganhos acumulados dos ganhos concluídos nas últimas 24 ho
     assert.match(statement, /l\.criado_em >= NOW\(\) - INTERVAL '24 hours'/);
     assert.match(statement, /l\.tipo = 'repasse_motorista'/);
     assert.match(statement, /AS ganhos_ultimas_24h/);
+    assert.match(statement, /l\.metadata->>'liquidacao' = 'pendente'/);
     assert.equal(resumo.ganhos_motorista, '150.00');
     assert.equal(resumo.ganhos_ultimas_24h, '30.00');
+    assert.equal(resumo.repasse_pendente, '24.00');
     assert.equal(resumo.saldo_carteira, '-4.50');
   } finally {
     if (originalCorrida) require.cache[corridaPath] = originalCorrida;
@@ -460,6 +469,8 @@ test('finalização em dinheiro registra ganho do motorista separado da taxa deb
     assert.deepEqual(walletUpdate.values, [-10, true, 42]);
     assert.equal(paymentInsert.values[4], 'pago');
     assert.equal(paymentInsert.values[6], 100);
+    assert.deepEqual(paymentInsert.values.slice(8, 12), [100, 0, 15, 'v1']);
+    assert.match(paymentInsert.sql, /debito_taxa_cancelamento, comissao_marketplace, versao_calculo_financeiro/);
     assert.match(paymentInsert.sql, /CASE WHEN \$5::varchar = 'pago'::varchar/);
     assert.ok(ledgerEntries.every(({ sql }) => /VALUES \(\$1,\$2,\$3,\$4,\$5,\$6,'BRL',\$7,\$8::jsonb\)/.test(sql)));
     assert.ok(ledgerEntries.every(({ sql }) => /ON CONFLICT \(referencia_unica\) WHERE referencia_unica IS NOT NULL DO NOTHING/.test(sql)));
@@ -468,6 +479,49 @@ test('finalização em dinheiro registra ganho do motorista separado da taxa deb
     ]);
     assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
     assert.equal(calls.some(({ sql }) => sql === 'ROLLBACK'), false);
+  } finally {
+    if (originalCorrida) require.cache[corridaPath] = originalCorrida;
+    else delete require.cache[corridaPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase;
+    else delete require.cache[databasePath];
+  }
+});
+
+test('criação da corrida persiste débito de cancelamento separado da tarifa e da comissão', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const corridaPath = require.resolve('../src/models/Corrida');
+  const originalDatabase = require.cache[databasePath];
+  const originalCorrida = require.cache[corridaPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT id, debito_pendente, status_conta/.test(sql)) return { rows: [{ id: 9, debito_pendente: '3.00', status_conta: 'ativa' }] };
+      if (/SELECT id FROM corridas/.test(sql)) return { rows: [] };
+      if (/SELECT id, valor, valor_recuperado/.test(sql)) return { rows: [{ id: 13, valor: '3.00', valor_recuperado: '0.00' }] };
+      if (/INSERT INTO corridas/.test(sql)) return { rows: [{ id: 88, status: 'solicitada', valor: '7.00' }] };
+      if (/INSERT INTO movi_pagamentos/.test(sql)) return { rows: [] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client } };
+  delete require.cache[corridaPath];
+  try {
+    const Corrida = require('../src/models/Corrida');
+    await Corrida.criar({
+      passageiro_id: 9, origem: 'Origem Caruaru', destino: 'Destino Caruaru',
+      origem_lat: -8.28, origem_lng: -35.97, destino_lat: -8.29, destino_lng: -35.96,
+      categoria: 'moto', distancia_km: 2, tempo_minutos: 8, dinamica_multiplicador: 1,
+      valor: 7, ganho_motorista: 5.95, ganho_app: 1.05, percentual_comissao_app: 15,
+      percentual_repasse_motorista: 85, forma_pagamento: 'dinheiro', tarifa_id: 1,
+      tarifa_versao: 1, tarifa_snapshot: {}, valor_base_cliente: 7, valor_dinamica_cliente: 0,
+    });
+    const paymentInsert = calls.find(({ sql }) => /INSERT INTO movi_pagamentos/.test(sql));
+    assert.deepEqual(paymentInsert.values.slice(3, 4), [10]);
+    assert.deepEqual(paymentInsert.values.slice(6, 10), [7, 3, 1.05, '1']);
+    assert.match(paymentInsert.sql, /tarifa_base, taxa_processamento, debito_taxa_cancelamento,\s*comissao_marketplace/);
+    assert.equal(calls.filter(({ sql }) => sql === 'COMMIT').length, 1);
   } finally {
     if (originalCorrida) require.cache[corridaPath] = originalCorrida;
     else delete require.cache[corridaPath];
@@ -505,6 +559,68 @@ test('acerto parcial em dinheiro separa comissão única, adiantamento e teto de
   assert.equal(edge.commissionAlreadyCoveredByCash, 10);
   assert.equal(edge.commissionAllocatedToDebt, 5);
   assert.equal(edge.driverAdvance, 0);
+});
+
+test('recuperação da taxa de cancelamento em dinheiro não entra na base de comissão da corrida', () => {
+  assert.deepEqual(calculateCashRideCollection({ fare: 7, cancellationDebt: 3, received: 10 }), {
+    fare: 7, cancellationDebt: 3, totalDue: 10, totalReceived: 10,
+    fareReceived: 7, cancellationDebtRecovered: 3, fareDebt: 0,
+  });
+  assert.deepEqual(calculateCashRideCollection({ fare: 7, cancellationDebt: 3, received: 9 }), {
+    fare: 7, cancellationDebt: 3, totalDue: 10, totalReceived: 9,
+    fareReceived: 7, cancellationDebtRecovered: 2, fareDebt: 0,
+  });
+  assert.deepEqual(calculateCashRideCollection({ fare: 7, cancellationDebt: 3, received: 5 }), {
+    fare: 7, cancellationDebt: 3, totalDue: 10, totalReceived: 5,
+    fareReceived: 5, cancellationDebtRecovered: 0, fareDebt: 2,
+  });
+});
+
+test('corrida de R$7 com débito anterior de R$3 e pagamento em dinheiro separa comissão e recuperação', async () => {
+  const databasePath = require.resolve('../src/config/database');
+  const corridaPath = require.resolve('../src/models/Corrida');
+  const originalDatabase = require.cache[databasePath];
+  const originalCorrida = require.cache[corridaPath];
+  const calls = [];
+  const client = {
+    async query(sql, values = []) {
+      calls.push({ sql, values });
+      if (/SELECT \* FROM corridas/.test(sql)) return { rows: [{
+        id: 88, passageiro_id: 9, motorista_id: 42, status: 'em_andamento', status_pagamento: 'pendente',
+        forma_pagamento: 'dinheiro', valor: '7.00', ganho_motorista: '5.95', ganho_app: '1.05', debito_taxa_cancelamento: '3.00',
+      }] };
+      if (/SELECT saldo_carteira, bloqueado_dinheiro/.test(sql)) return { rows: [{ saldo_carteira: '0.00', bloqueado_dinheiro: false }] };
+      if (/SELECT id, valor, valor_recuperado/.test(sql)) return { rows: [{ id: 11, valor: '3.00', valor_recuperado: '0.00' }] };
+      if (/SELECT debito_pendente FROM passageiros/.test(sql)) return { rows: [{ debito_pendente: '3.00' }] };
+      if (/INSERT INTO transacoes_motoristas/.test(sql)) return { rows: [{ id: 17 }] };
+      if (/INSERT INTO movi_pagamentos/.test(sql)) return { rows: [{ id: 901 }] };
+      return { rows: [] };
+    },
+    release() {},
+  };
+  require.cache[databasePath] = { exports: { connect: async () => client } };
+  delete require.cache[corridaPath];
+  try {
+    const Corrida = require('../src/models/Corrida');
+    const result = await Corrida.finalizarComPagamento(88, 42, { status_pagamento: 'pago', valor_recebido_motorista: 10 });
+    const walletUpdate = calls.find(({ sql }) => /UPDATE motoristas SET saldo_carteira/.test(sql));
+    const debtUpdate = calls.find(({ sql }) => /UPDATE passageiros SET debito_pendente/.test(sql));
+    const commission = calls.filter(({ sql }) => /VALUES \(\$1,\$2,'debito_taxa_app'/.test(sql));
+    const ledger = calls.filter(({ sql }) => /INSERT INTO movi_lancamentos_financeiros/.test(sql));
+    assert.equal(result.sucesso, true);
+    assert.equal(result.debito_taxa_cancelamento_recuperado, 3);
+    assert.deepEqual(walletUpdate.values, [-4.05, false, 42]);
+    assert.deepEqual(debtUpdate.values, [0, 9]);
+    assert.equal(commission.length, 1);
+    assert.deepEqual(commission[0].values.slice(2, 3), [-1.05]);
+    assert.ok(ledger.some(({ sql, values }) => sql.includes("'recuperacao_taxa_cancelamento_movi'") && values[3] === 3));
+    assert.ok(ledger.some(({ sql, values }) => sql.includes("'baixa_debito_taxa_cancelamento'") && values[3] === -3));
+    assert.equal(calls.filter(({ sql }) => /INSERT INTO movi_taxas_cancelamento_recuperacoes/.test(sql)).length, 1);
+    assert.equal(calls.some(({ sql }) => sql === 'COMMIT'), true);
+  } finally {
+    if (originalCorrida) require.cache[corridaPath] = originalCorrida; else delete require.cache[corridaPath];
+    if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
 });
 
 test('corrida em dinheiro parcial registra comissão única e exposição sem duplicar a taxa no saldo', async () => {
@@ -821,5 +937,143 @@ test('resposta do usuário reabre chamados aguardando resposta ou já resolvidos
   } finally {
     if (originalModel) require.cache[modelPath] = originalModel; else delete require.cache[modelPath];
     if (originalDatabase) require.cache[databasePath] = originalDatabase; else delete require.cache[databasePath];
+  }
+});
+
+test('solicitação usa a cotação assinada e não recalcula a tarifa ou a dinâmica', async () => {
+  const modulePaths = {
+    corrida: require.resolve('../src/models/Corrida'),
+    redis: require.resolve('../src/config/redis'),
+    maps: require.resolve('../src/services/mapsService'),
+    dinamica: require.resolve('../src/services/dinamicaService'),
+    realtime: require.resolve('../src/services/realtimeService'),
+    env: require.resolve('../src/config/env'),
+    offerWorker: require.resolve('../src/jobs/offerWorker'),
+    database: require.resolve('../src/config/database'),
+    quote: require.resolve('../src/services/rideQuoteService'),
+    controller: require.resolve('../src/controllers/corridaController'),
+  };
+  const originals = Object.fromEntries(Object.entries(modulePaths).map(([name, path]) => [name, require.cache[path]]));
+  const calls = [];
+  let createdRide;
+
+  try {
+    require.cache[modulePaths.corrida] = { exports: {
+      criar: async (data) => {
+        calls.push('criar');
+        createdRide = { ...data, id: 801, status: 'solicitada', debito_taxa_cancelamento: 0 };
+        return createdRide;
+      },
+    } };
+    require.cache[modulePaths.redis] = { exports: {} };
+    require.cache[modulePaths.maps] = { exports: { calcularRota: async () => { throw new Error('solicitação não pode recalcular rota/tarifa'); } } };
+    require.cache[modulePaths.dinamica] = { exports: {
+      registrarDemanda: async () => { calls.push('demanda'); },
+      calcularMultiplicador: async () => { throw new Error('solicitação não pode recalcular dinâmica'); },
+      buscarMotoristasProximos: async () => [],
+      motoristaDisponivel: async () => false,
+      marcarMotoristaDisponivel: async () => {},
+      limparDemandaPassageiro: async () => {},
+    } };
+    require.cache[modulePaths.realtime] = { exports: { emitToUser: async () => {} } };
+    require.cache[modulePaths.env] = { exports: { MP_CHECKOUT_ENABLED: false, PAYMENT_PROVIDER: 'none' } };
+    require.cache[modulePaths.offerWorker] = { exports: { despacharProximaOferta: async () => false } };
+    require.cache[modulePaths.database] = { exports: { query: async () => ({ rows: [] }) } };
+    require.cache[modulePaths.quote] = { exports: {
+      emitirCotacao: () => 'unused',
+      validarCotacao: ({ token, passageiroId }) => {
+        calls.push(`cotacao:${token}:${passageiroId}`);
+        return {
+          debito_taxa_cancelamento: 0,
+          estimativa: {
+            distanciaKm: 2, tempoMin: 8, multiplicadorDinamica: 1.5, dinamicaAplicada: '1.5x',
+            valorPassageiro: 15, ganhoMotorista: 12.75, ganhoApp: 2.25,
+            percentualComissaoApp: 15, percentualRepasseMotorista: 85,
+            tarifaId: 1, tarifaVersao: 'v1', tarifaSnapshot: {},
+            valorBaseCliente: 10, valorDinamicaCliente: 15,
+          },
+        };
+      },
+    } };
+    delete require.cache[modulePaths.controller];
+
+    const controller = require('../src/controllers/corridaController');
+    const response = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+    await controller.solicitarCorrida({
+      body: {
+        origem: 'Minha localização', destino: 'Destino sintético',
+        origem_lat: -8.2833, origem_lng: -35.9761,
+        destino_lat: -8.28, destino_lng: -35.97,
+        categoria: 'moto', forma_pagamento: 'dinheiro',
+        cotacao_token: 'trusted-test-quote',
+      },
+      usuario: { id: 7 }, get: () => null,
+    }, response);
+
+    assert.deepEqual(calls, ['cotacao:trusted-test-quote:7', 'criar', 'demanda']);
+    assert.equal(createdRide.dinamica_multiplicador, 1.5);
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.body.detalhes_valores.valorPassageiro, 15);
+  } finally {
+    for (const [name, path] of Object.entries(modulePaths)) {
+      if (originals[name]) require.cache[path] = originals[name];
+      else delete require.cache[path];
+    }
+  }
+});
+
+test('cotação dinâmica é assinada, vinculada à entrada e expira em cinco minutos', () => {
+  const { QUOTE_TTL_MS, emitirCotacao, validarCotacao } = require('../src/services/rideQuoteService');
+  const entrada = {
+    origem: 'Centro de Caruaru', destino: 'Maurício de Nassau',
+    origem_lat: -8.28, origem_lng: -35.97,
+    destino_lat: -8.285, destino_lng: -35.965,
+    categoria: 'moto', forma_pagamento: 'dinheiro',
+  };
+  const estimativa = {
+    distanciaKm: 2, tempoMin: 8, multiplicadorDinamica: 1.5,
+    valorPassageiro: 15, ganhoMotorista: 12.75, ganhoApp: 2.25,
+    geometria: { coordinates: Array.from({ length: 10000 }, () => [-35.97, -8.28]) },
+  };
+  const originalNow = Date.now;
+  try {
+    Date.now = () => 1_000_000;
+    const token = emitirCotacao({ passageiroId: 7, entrada, estimativa, debitoTaxaCancelamento: 3 });
+    assert.ok(token.length < 20000, 'geometria não deve inflar o token assinado');
+    assert.equal(QUOTE_TTL_MS, 300000);
+    const cotacao = validarCotacao({ token, passageiroId: 7, entrada });
+    assert.equal(cotacao.estimativa.valorPassageiro, 15);
+    assert.equal(cotacao.estimativa.multiplicadorDinamica, 1.5);
+    assert.equal(cotacao.debito_taxa_cancelamento, 3);
+    assert.equal('geometria' in cotacao.estimativa, false);
+
+    const cotacao2x = emitirCotacao({
+      passageiroId: 7,
+      entrada,
+      estimativa: { ...estimativa, multiplicadorDinamica: 2, valorPassageiro: 20 },
+      debitoTaxaCancelamento: 0,
+    });
+    const validada2x = validarCotacao({ token: cotacao2x, passageiroId: 7, entrada });
+    assert.equal(validada2x.estimativa.multiplicadorDinamica, 2);
+    assert.equal(validada2x.estimativa.valorPassageiro, 20);
+
+    const [conteudo, assinatura] = token.split('.');
+    const assinaturaAlterada = `${assinatura.startsWith('A') ? 'B' : 'A'}${assinatura.slice(1)}`;
+    assert.throws(
+      () => validarCotacao({ token: `${conteudo}.${assinaturaAlterada}`, passageiroId: 7, entrada }),
+      (error) => error.code === 'RIDE_QUOTE_INVALID',
+    );
+    assert.throws(
+      () => validarCotacao({ token, passageiroId: 7, entrada: { ...entrada, destino_lat: -8.3 } }),
+      (error) => error.code === 'RIDE_QUOTE_MISMATCH',
+    );
+
+    Date.now = () => 1_000_000 + QUOTE_TTL_MS;
+    assert.throws(
+      () => validarCotacao({ token, passageiroId: 7, entrada }),
+      (error) => error.code === 'RIDE_QUOTE_EXPIRED',
+    );
+  } finally {
+    Date.now = originalNow;
   }
 });

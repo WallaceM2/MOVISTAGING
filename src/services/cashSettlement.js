@@ -35,4 +35,24 @@ function calculateCashSettlement({ fare, received, protectionCap = CASH_PROTECTI
   };
 }
 
-module.exports = { CASH_PROTECTION_CAP, calculateCashSettlement };
+function calculateCashRideCollection({ fare, cancellationDebt = 0, received }) {
+  const totalFare = money(fare);
+  const feeDebt = money(cancellationDebt);
+  const amountReceived = money(received);
+  if (![totalFare, feeDebt, amountReceived].every(Number.isFinite) || totalFare <= 0 || feeDebt < 0 || amountReceived < 0 || amountReceived > totalFare + feeDebt) {
+    throw new TypeError('Valores inválidos para cobrança da corrida e recuperação de débito.');
+  }
+  const fareReceived = money(Math.min(totalFare, amountReceived));
+  const cancellationDebtRecovered = money(Math.min(feeDebt, Math.max(0, amountReceived - totalFare)));
+  return {
+    fare: totalFare,
+    cancellationDebt: feeDebt,
+    totalDue: money(totalFare + feeDebt),
+    totalReceived: amountReceived,
+    fareReceived,
+    cancellationDebtRecovered,
+    fareDebt: money(totalFare - fareReceived),
+  };
+}
+
+module.exports = { CASH_PROTECTION_CAP, calculateCashSettlement, calculateCashRideCollection };

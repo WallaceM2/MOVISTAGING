@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#061014">
+    <title>MOVI · Prévia móvel</title>
+    <link rel="stylesheet" href="/admin/phone-preview.css">
+    <script src="/admin/phone-preview.js" defer></script>
+  </head>
+  <body>
+    <main class="preview-app">
+      <header class="preview-toolbar">
+        <div><p class="eyebrow">PRÉVIA RESPONSIVA</p><h1>Painel MOVI no celular</h1></div>
+        <div class="toolbar-actions">
+          <label for="viewport">Viewport</label>
+          <select id="viewport" aria-label="Largura da prévia">
+            <option value="360">360 px</option>
+            <option value="390" selected>390 px</option>
+            <option value="430">430 px</option>
+          </select>
+          <button id="reload-preview" type="button">Atualizar página</button>
+          <a href="/admin/">Abrir sem moldura</a>
+        </div>
+      </header>
+      <p class="hint">A página dentro do aparelho é o painel real do V3. Salve suas alterações e atualize a prévia para recarregar o HTML, CSS e JavaScript.</p>
+      <section class="stage" aria-label="Simulador de aparelho">
+        <div id="device" class="device" data-width="390">
+          <div class="side-button side-button-left"></div>
+          <div class="side-button side-button-right"></div>
+          <div class="screen">
+            <div class="dynamic-island" aria-hidden="true"></div>
+            <iframe id="site-preview" src="/admin/?preview=mobile" title="Painel administrativo MOVI em viewport de celular"></iframe>
+            <div class="home-indicator" aria-hidden="true"></div>
+          </div>
+        </div>
+      </section>
+      <footer>Prévia visual local · Não representa um AVD nem substitui a validação no Android.</footer>
+    </main>
+  </body>
+</html>

@@ -5,7 +5,7 @@ const { verificarToken, permitirTipo, exigirContaAtiva } = require('../middlewar
 const validar = require('../middlewares/validar');
 const { validarParams } = validar;
 const asyncHandler = require('../middlewares/asyncHandler');
-const { corridaSchema, finalizacaoSchema, codigoEmbarqueSchema } = require('../validators/corridaValidator');
+const { corridaSchema, solicitarCorridaSchema, finalizacaoSchema, codigoEmbarqueSchema } = require('../validators/corridaValidator');
 const { z } = require('zod');
 const idempotency = require('../middlewares/idempotency');
 
@@ -14,7 +14,7 @@ const authPassenger = [verificarToken, permitirTipo('passageiro'), exigirContaAt
 const authDriver = [verificarToken, permitirTipo('motorista'), exigirContaAtiva];
 
 router.post('/estimar', ...authPassenger, validar(corridaSchema), asyncHandler(corridaController.estimar));
-router.post('/solicitar', ...authPassenger, validar(corridaSchema), idempotency(), asyncHandler(corridaController.solicitarCorrida));
+router.post('/solicitar', ...authPassenger, validar(solicitarCorridaSchema), idempotency(), asyncHandler(corridaController.solicitarCorrida));
 router.get('/ofertas', ...authDriver, asyncHandler(corridaController.listarOfertas));
 router.get('/:id', verificarToken, validarParams(idSchema), asyncHandler(corridaController.verCorrida));
 router.post('/:id/recusar', ...authDriver, validarParams(idSchema), idempotency(), asyncHandler(corridaController.recusarCorrida));

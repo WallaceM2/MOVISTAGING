@@ -15,6 +15,7 @@ const AppError = require('../errors/AppError');
 const envConfig = require('../config/env');
 const { despacharProximaOferta } = require('../jobs/offerWorker');
 const pool = require('../config/database');
+const { emitirCotacao, validarCotacao } = require('../services/rideQuoteService');
 
 async function corridaParaPassageiro(corrida) {
   if (!corrida?.motorista_id) return corridaParaPassageiroComCodigo(corrida);
@@ -57,7 +58,19 @@ async function estimar(req, res) {
   }
   const multiplicador = await calcularMultiplicador(origem_lat, origem_lng, categoria);
   const estimativa = await calcularRota(origem_lat, origem_lng, destino_lat, destino_lng, categoria, multiplicador);
-  res.json({ mensagem: 'Estimativa calculada com sucesso', estimativa });
+  const debitoTaxaCancelamento = await Corrida.debitoTaxaCancelamentoDisponivel(req.usuario.id);
+  const cotacao_token = emitirCotacao({
+    passageiroId: req.usuario.id,
+    entrada: { ...req.body, forma_pagamento: forma_pagamento || 'dinheiro' },
+    estimativa,
+    debitoTaxaCancelamento,
+  });
+  res.json({ mensagem: 'Estimativa calculada com sucesso', estimativa: {
+    ...estimativa,
+    debitoTaxaCancelamento,
+    totalPassageiro: Number((estimativa.valorPassageiro + debitoTaxaCancelamento).toFixed(2)),
+    cotacao_token,
+  } });
 }
 
 async function solicitarCorrida(req, res) {
@@ -66,9 +79,12 @@ async function solicitarCorrida(req, res) {
   if (forma_pagamento !== 'dinheiro' && (!envConfig.MP_CHECKOUT_ENABLED || envConfig.PAYMENT_PROVIDER === 'none')) {
     throw new AppError('Esta forma de pagamento ainda não está habilitada neste ambiente.', 409, 'PAYMENT_PROVIDER_REQUIRED');
   }
-  await registrarDemanda(origem_lat, origem_lng, passageiro_id, categoria);
-  const multiplicador = await calcularMultiplicador(origem_lat, origem_lng, categoria);
-  const estimativa = await calcularRota(origem_lat, origem_lng, destino_lat, destino_lng, categoria, multiplicador);
+  const cotacao = validarCotacao({
+    token: req.body.cotacao_token,
+    passageiroId: passageiro_id,
+    entrada: { ...req.body, forma_pagamento: forma_pagamento || 'dinheiro' },
+  });
+  const estimativa = cotacao.estimativa;
 
   const novaCorrida = await Corrida.criar({
     passageiro_id,
@@ -83,7 +99,17 @@ async function solicitarCorrida(req, res) {
     forma_pagamento: forma_pagamento || 'dinheiro',
     tarifa_id: estimativa.tarifaId, tarifa_versao: estimativa.tarifaVersao, tarifa_snapshot: estimativa.tarifaSnapshot,
     valor_base_cliente: estimativa.valorBaseCliente, valor_dinamica_cliente: estimativa.valorDinamicaCliente,
+    debito_taxa_cancelamento_esperado: cotacao.debito_taxa_cancelamento,
   });
+  // Só inclua o passageiro no mapa de demanda depois de calcular e persistir
+  // a tarifa. Assim, uma solicitação não aumenta a própria tarifa que acabou
+  // de ser apresentada na confirmação.
+  await registrarDemanda(origem_lat, origem_lng, passageiro_id, categoria);
+  const estimativaComDebito = {
+    ...estimativa,
+    debitoTaxaCancelamento: Number(novaCorrida.debito_taxa_cancelamento || 0),
+    totalPassageiro: Number((estimativa.valorPassageiro + Number(novaCorrida.debito_taxa_cancelamento || 0)).toFixed(2)),
+  };
 
   const motoristas = await buscarMotoristasProximos(origem_lat, origem_lng, env.DRIVER_SEARCH_RADIUS_KM, categoria);
   const primeiraOferta = motoristas.length ? await despacharProximaOferta(novaCorrida.id) : false;
@@ -97,7 +123,7 @@ async function solicitarCorrida(req, res) {
   res.status(201).json({
     mensagem: 'Corrida solicitada com sucesso!',
     corrida: removerCodigoEmbarque(novaCorrida),
-    detalhes_valores: estimativa,
+    detalhes_valores: estimativaComDebito,
     motoristas_encontrados: motoristas.length,
     oferta_enviada: primeiraOferta,
   });

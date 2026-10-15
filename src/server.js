@@ -1,5 +1,6 @@
 const env = require('./config/env');
 const express = require('express');
+const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const helmet = require('helmet');
@@ -127,7 +128,12 @@ app.use('/api', documentoRoutes);
 app.use('/api', denunciaRoutes);
 app.use('/health', healthRoutes);
 
-app.get('/', (req, res) => res.json({ nome: 'Movi API', status: 'online', versao: 'v1' }));
+const adminWebRoot = path.join(__dirname, '../admin-web');
+app.use('/admin', express.static(adminWebRoot, { dotfiles: 'deny', index: 'index.html', fallthrough: true }));
+app.get('/admin', (req, res) => res.redirect(302, '/admin/'));
+
+const publicWebRoot = path.join(__dirname, '../public-web');
+app.use(express.static(publicWebRoot, { dotfiles: 'deny', index: 'index.html', fallthrough: true }));
 
 function socketAuthError(code) {
   const error = new Error(code);

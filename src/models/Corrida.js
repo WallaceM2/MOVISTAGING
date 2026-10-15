@@ -3,7 +3,7 @@ const AppError = require('../errors/AppError');
 const { assertRideTransition } = require('../utils/stateMachine');
 const crypto = require('crypto');
 const env = require('../config/env');
-const { calculateCashSettlement } = require('../services/cashSettlement');
+const { calculateCashSettlement, calculateCashRideCollection } = require('../services/cashSettlement');
 const { calculatePassengerCancellationFee } = require('../services/cancellationFee');
 
 const ACTIVE_STATUSES = ['solicitada', 'aceita', 'em_andamento'];
@@ -35,7 +35,8 @@ function assertFinancialSnapshot({ valor, ganho_motorista, ganho_app, percentual
 }
 
 async function registrarLedgerCorrida(client, corrida, pagamentoId = null) {
-  const valorRecebido = Number(corrida.valor_recebido_motorista ?? corrida.valor);
+  const valorRecebidoTotal = Number(corrida.valor_recebido_motorista ?? corrida.valor);
+  const valorRecebido = Math.min(valorRecebidoTotal, Number(corrida.valor));
   const acertoParcial = corrida.forma_pagamento === 'dinheiro' && valorRecebido < Number(corrida.valor)
     ? calculateCashSettlement({ fare: corrida.valor, received: valorRecebido })
     : null;
@@ -48,7 +49,7 @@ async function registrarLedgerCorrida(client, corrida, pagamentoId = null) {
     : Number((brutoRecebido - repasseRecebido).toFixed(2));
   if (brutoRecebido <= 0) return;
   const entries = [
-    { tipo: 'corrida_bruta', valor: brutoRecebido, ref: `corrida:${corrida.id}:bruta`, metadata: { papel: acertoParcial ? 'valor_bruto_contratado_com_debito' : 'valor_bruto_recebido', status_pagamento: corrida.status_pagamento, valor_total_corrida: Number(corrida.valor), valor_recebido: valorRecebido, debito_pendente: acertoParcial?.passengerDebt || 0 } },
+    { tipo: 'corrida_bruta', valor: brutoRecebido, ref: `corrida:${corrida.id}:bruta`, metadata: { papel: acertoParcial ? 'valor_bruto_contratado_com_debito' : 'valor_bruto_recebido', status_pagamento: corrida.status_pagamento, valor_total_corrida: Number(corrida.valor), valor_recebido_na_corrida: valorRecebido, valor_recebido_total: valorRecebidoTotal, debito_taxa_cancelamento_recuperado: Number(corrida.debito_taxa_cancelamento_recuperado || 0), debito_pendente: acertoParcial?.passengerDebt || 0 } },
     { tipo: 'repasse_motorista', valor: -repasseRecebido, ref: `corrida:${corrida.id}:repasse`, metadata: { papel: 'ganho_economico_motorista', percentual: 85, proporcao_recebida: acertoParcial ? 1 : proporcaoRecebida, adiantamento_previsto: acertoParcial?.driverAdvance || 0, liquidacao: acertoParcial ? 'pendente' : 'registrada' } },
   ];
   if (!acertoParcial || comissaoRecebida > 0) {
@@ -79,7 +80,7 @@ async function registrarLedgerCorrida(client, corrida, pagamentoId = null) {
 }
 
 async function criar(dados) {
-  const { idempotency_key = null, passageiro_id, origem, destino, origem_lat, origem_lng, destino_lat, destino_lng, categoria, distancia_km, tempo_minutos, dinamica_multiplicador, valor, ganho_motorista, ganho_app, percentual_comissao_app = 15, percentual_repasse_motorista = 85, forma_pagamento = 'dinheiro', area_operacao_id = null, tarifa_id = null, tarifa_versao = null, tarifa_snapshot = {}, valor_base_cliente = null, valor_dinamica_cliente = null } = dados;
+  const { idempotency_key = null, passageiro_id, origem, destino, origem_lat, origem_lng, destino_lat, destino_lng, categoria, distancia_km, tempo_minutos, dinamica_multiplicador, valor, ganho_motorista, ganho_app, percentual_comissao_app = 15, percentual_repasse_motorista = 85, forma_pagamento = 'dinheiro', area_operacao_id = null, tarifa_id = null, tarifa_versao = null, tarifa_snapshot = {}, valor_base_cliente = null, valor_dinamica_cliente = null, debito_taxa_cancelamento_esperado = null } = dados;
   assertFinancialSnapshot({ valor, ganho_motorista, ganho_app, percentual_comissao_app, percentual_repasse_motorista });
   const client = await pool.connect();
   try {
@@ -103,31 +104,62 @@ async function criar(dados) {
     `, [passageiro_id, ACTIVE_STATUSES]);
     if (active.rows.length) throw new AppError('Você já possui uma corrida em andamento.', 409, 'ACTIVE_RIDE_EXISTS');
 
+    const pendingCancellationFees = await client.query(`
+      SELECT id, valor, valor_recuperado
+      FROM movi_taxas_cancelamento
+      WHERE passageiro_id = $1 AND status = 'pendente' AND corrida_reserva_id IS NULL
+        AND valor > valor_recuperado
+      ORDER BY criado_em, id
+      FOR UPDATE SKIP LOCKED;
+    `, [passageiro_id]);
+    const cancellationFeeIds = pendingCancellationFees.rows.map((row) => Number(row.id));
+    const cancellationDebt = Number(pendingCancellationFees.rows.reduce((sum, row) => sum + Number(row.valor) - Number(row.valor_recuperado), 0).toFixed(2));
+    if (debito_taxa_cancelamento_esperado !== null
+      && Math.abs(cancellationDebt - Number(debito_taxa_cancelamento_esperado)) > 0.001) {
+      throw new AppError('Seu saldo mudou desde a estimativa. Atualize a cotação antes de solicitar.', 409, 'RIDE_QUOTE_DEBT_CHANGED');
+    }
+
     const { rows } = await client.query(`
       INSERT INTO corridas (
         passageiro_id, origem, destino, origem_lat, origem_lng, destino_lat, destino_lng,
         categoria, distancia_km, tempo_minutos, dinamica_multiplicador,
         valor, status, ganho_motorista, ganho_app, percentual_comissao_app, percentual_repasse_motorista,
         forma_pagamento, status_pagamento, codigo_embarque, solicitada_em, atualizado_em,
-        area_operacao_id, tarifa_id, tarifa_versao, tarifa_snapshot, valor_base_cliente, valor_dinamica_cliente, valor_taxa_app, valor_repasse_motorista
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'solicitada',$13,$14,$15,$16,$17,'pendente',$18,NOW(),NOW(),$19,$20,$21,$22::jsonb,$23,$24,$14,$13)
+        area_operacao_id, tarifa_id, tarifa_versao, tarifa_snapshot, valor_base_cliente, valor_dinamica_cliente, valor_taxa_app, valor_repasse_motorista,
+        debito_taxa_cancelamento
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'solicitada',$13,$14,$15,$16,$17,'pendente',$18,NOW(),NOW(),$19,$20,$21,$22::jsonb,$23,$24,$14,$13,$25)
       RETURNING *;
     `, [
       passageiro_id, origem, destino, origem_lat, origem_lng, destino_lat, destino_lng,
       categoria, distancia_km, tempo_minutos, dinamica_multiplicador, valor, ganho_motorista, ganho_app,
       percentual_comissao_app, percentual_repasse_motorista, forma_pagamento, crypto.randomBytes(3).toString('hex').toUpperCase(),
-      area_operacao_id, tarifa_id, tarifa_versao, JSON.stringify(tarifa_snapshot || {}), valor_base_cliente, valor_dinamica_cliente,
+      area_operacao_id, tarifa_id, tarifa_versao, JSON.stringify(tarifa_snapshot || {}), valor_base_cliente, valor_dinamica_cliente, cancellationDebt,
     ]);
 
     const corrida = rows[0];
+    if (cancellationFeeIds.length) {
+      await client.query(`
+        UPDATE movi_taxas_cancelamento SET corrida_reserva_id = $1, atualizado_em = NOW()
+        WHERE id = ANY($2::bigint[]) AND passageiro_id = $3 AND status = 'pendente' AND corrida_reserva_id IS NULL;
+      `, [corrida.id, cancellationFeeIds, passageiro_id]);
+    }
     await client.query(`
-      INSERT INTO movi_pagamentos (corrida_id, passageiro_id, motorista_id, metodo, status, valor, valor_pago, moeda, idempotency_key, metadata)
-      VALUES ($1,$2,NULL,$3,'pendente',$4,0,'BRL',$5,$6::jsonb)
+      INSERT INTO movi_pagamentos (
+        corrida_id, passageiro_id, motorista_id, metodo, status, valor, valor_pago, moeda,
+        idempotency_key, metadata, tarifa_base, taxa_processamento, debito_taxa_cancelamento,
+        comissao_marketplace, versao_calculo_financeiro
+      )
+      VALUES ($1,$2,NULL,$3,'pendente',$4,0,'BRL',$5,$6::jsonb,$7,0,$8,$9,$10)
       ON CONFLICT (corrida_id) DO NOTHING;
-    `, [corrida.id, passageiro_id, forma_pagamento, Number(valor), idempotency_key, JSON.stringify({ origem: 'corrida.criar' })]);
+    `, [
+      corrida.id, passageiro_id, forma_pagamento,
+      Number((Number(valor) + cancellationDebt).toFixed(2)), idempotency_key,
+      JSON.stringify({ origem: 'corrida.criar', tarifa_base: Number(valor), debito_taxa_cancelamento: cancellationDebt }),
+      Number(valor), cancellationDebt, Number(ganho_app), String(tarifa_versao || 'v1'),
+    ]);
 
     await client.query('COMMIT');
-    return corrida;
+    return { ...corrida, debito_taxa_cancelamento: cancellationDebt };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -378,6 +410,11 @@ async function atualizarStatusControlado(id, nextStatus, actor) {
       : nextStatus === 'concluida' ? ', finalizada_em = NOW()' : '';
 
     if (nextStatus === 'cancelada') {
+      await client.query(`
+        UPDATE movi_taxas_cancelamento
+        SET corrida_reserva_id = NULL, atualizado_em = NOW()
+        WHERE corrida_reserva_id = $1 AND status = 'pendente';
+      `, [id]);
       // This project has no active payment provider yet. Close only local,
       // unprocessed pending payment records; provider-backed payments need a
       // real cancellation/refund round trip before their status can change.
@@ -493,9 +530,14 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
     let statusFinal = status_pagamento;
     let recebido = valor_recebido_motorista == null ? null : Number(valor_recebido_motorista);
     const valorTotal = Number(corrida.valor);
+    const debitoCancelamento = Number(corrida.debito_taxa_cancelamento || 0);
+    const totalDevido = Number((valorTotal + debitoCancelamento).toFixed(2));
     if (!FINALIZABLE_PAYMENT_STATUSES.has(statusFinal)) throw new AppError('Status de pagamento inválido.', 400, 'INVALID_PAYMENT_STATUS');
 
     if (corrida.forma_pagamento !== 'dinheiro') {
+      if (debitoCancelamento > 0) {
+        throw new AppError('A recuperação de taxa de cancelamento em pagamento digital depende da integração e conciliação do provedor. Nenhum saldo foi alterado.', 409, 'CANCELLATION_DEBT_PAYMENT_NOT_READY');
+      }
       if (corrida.status_pagamento !== 'pago') {
         throw new AppError('Pagamento digital ainda não foi confirmado pelo provedor.', 409, 'DIGITAL_PAYMENT_NOT_CONFIRMED');
       }
@@ -503,11 +545,17 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       recebido = valorTotal;
     } else {
       if (recebido == null && statusFinal !== 'nao_pago') throw new AppError('Informe o valor efetivamente recebido em uma corrida em dinheiro.', 400, 'PAYMENT_VALUE_REQUIRED');
-      if (recebido != null && (recebido < 0 || recebido > valorTotal + 0.01)) throw new AppError('Valor recebido inválido.', 400, 'INVALID_PAYMENT_VALUE');
-      if (statusFinal === 'pago' && Math.abs(recebido - valorTotal) > 0.01) throw new AppError('Para marcar uma corrida em dinheiro como paga, o valor recebido deve corresponder ao total da corrida.', 400, 'PAYMENT_VALUE_MISMATCH');
-      if (statusFinal === 'parcial' && (recebido == null || recebido <= 0 || recebido >= valorTotal)) throw new AppError('Pagamento parcial exige um valor recebido positivo e menor que o total da corrida.', 400, 'INVALID_PARTIAL_PAYMENT');
+      if (recebido != null && (recebido < 0 || recebido > totalDevido + 0.01)) throw new AppError('Valor recebido inválido.', 400, 'INVALID_PAYMENT_VALUE');
+      if (statusFinal === 'pago' && Math.abs(recebido - totalDevido) > 0.01) throw new AppError('Para marcar a corrida como paga, informe todo o valor da corrida e os débitos apresentados no app.', 400, 'PAYMENT_VALUE_MISMATCH');
+      if (statusFinal === 'parcial' && (recebido == null || recebido <= 0 || recebido >= totalDevido)) throw new AppError('Pagamento parcial exige um valor recebido positivo e menor que o total apresentado ao passageiro.', 400, 'INVALID_PARTIAL_PAYMENT');
       if (statusFinal === 'nao_pago' && Number(recebido || 0) > 0) throw new AppError('Pagamento não pago não pode possuir valor recebido.', 400, 'INVALID_UNPAID_PAYMENT');
     }
+
+    const cashCollection = corrida.forma_pagamento === 'dinheiro'
+      ? calculateCashRideCollection({ fare: valorTotal, cancellationDebt: debitoCancelamento, received: Number(recebido || 0) })
+      : null;
+    const valorRecebidoNaCorrida = cashCollection?.fareReceived ?? Number(recebido ?? valorTotal);
+    const taxaCancelamentoRecuperada = cashCollection?.cancellationDebtRecovered ?? 0;
 
     await client.query(`
       UPDATE corridas
@@ -521,12 +569,12 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       const driver = driverResult.rows[0];
       if (!driver) throw new AppError('Motorista não encontrado.', 404, 'DRIVER_NOT_FOUND');
       const saldoAnterior = Number(driver.saldo_carteira || 0);
-      const valorRecebido = Number(recebido || 0);
+      const valorRecebido = valorRecebidoNaCorrida;
       const acertoParcial = statusFinal === 'parcial' || statusFinal === 'nao_pago'
         ? calculateCashSettlement({ fare: valorTotal, received: valorRecebido })
         : null;
       const ganhoApp = acertoParcial ? acertoParcial.commissionAlreadyCoveredByCash : Number((valorRecebido * 0.15).toFixed(2));
-      const saldoAtual = Number((saldoAnterior - ganhoApp).toFixed(2));
+      const saldoAtual = Number((saldoAnterior - ganhoApp - taxaCancelamentoRecuperada).toFixed(2));
       const bloqueado = deveBloquearCorridasEmDinheiro(saldoAtual);
 
       await client.query(`
@@ -541,12 +589,25 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
         await client.query(`
           INSERT INTO transacoes_motoristas (motorista_id, corrida_id, tipo, valor, saldo_anterior, saldo_atual)
           VALUES ($1,$2,'debito_taxa_app',$3,$4,$5)
-        `, [motoristaId, corridaId, -ganhoApp, saldoAnterior, saldoAtual]);
+        `, [motoristaId, corridaId, -ganhoApp, saldoAnterior, Number((saldoAnterior - ganhoApp).toFixed(2))]);
+      }
+      if (taxaCancelamentoRecuperada > 0) {
+        const recoveryReference = `corrida:${corridaId}:recuperacao_taxa_cancelamento:carteira`;
+        const recoveryTx = await client.query(`
+          INSERT INTO transacoes_motoristas (
+            motorista_id, corrida_id, tipo, valor, saldo_anterior, saldo_atual, referencia_externa, metadata
+          ) VALUES ($1,$2,'debito_recuperacao_taxa_cancelamento',$3,$4,$5,$6,$7::jsonb)
+          ON CONFLICT (referencia_externa)
+            WHERE referencia_externa IS NOT NULL AND tipo = 'debito_recuperacao_taxa_cancelamento'
+          DO NOTHING
+          RETURNING id;
+        `, [motoristaId, corridaId, -taxaCancelamentoRecuperada, Number((saldoAnterior - ganhoApp).toFixed(2)), saldoAtual, recoveryReference, JSON.stringify({ origem: 'recuperacao_taxa_cancelamento_em_dinheiro', valor_recebido_motorista: Number(recebido || 0) })]);
+        if (!recoveryTx.rows[0]) throw new AppError('A recuperação deste débito já foi registrada.', 409, 'CANCELLATION_DEBT_ALREADY_RECOVERED');
       }
     }
 
     if (statusFinal === 'parcial' || statusFinal === 'nao_pago') {
-      const valorRecebido = Number(recebido || 0);
+      const valorRecebido = valorRecebidoNaCorrida;
       const diferenca = Number((valorTotal - valorRecebido).toFixed(2));
       if (diferenca > 0) {
         const passenger = await client.query('SELECT debito_pendente FROM passageiros WHERE id = $1 FOR UPDATE', [corrida.passageiro_id]);
@@ -580,11 +641,82 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       }
     }
 
+    if (taxaCancelamentoRecuperada > 0) {
+      const feesResult = await client.query(`
+        SELECT id, valor, valor_recuperado
+        FROM movi_taxas_cancelamento
+        WHERE corrida_reserva_id = $1 AND passageiro_id = $2 AND status = 'pendente'
+          AND valor > valor_recuperado
+        ORDER BY criado_em, id
+        FOR UPDATE;
+      `, [corridaId, corrida.passageiro_id]);
+      let remaining = taxaCancelamentoRecuperada;
+      for (const fee of feesResult.rows) {
+        if (remaining <= 0) break;
+        const available = Number((Number(fee.valor) - Number(fee.valor_recuperado)).toFixed(2));
+        const recovered = Number(Math.min(available, remaining).toFixed(2));
+        if (recovered <= 0) continue;
+        await client.query(`
+          INSERT INTO movi_taxas_cancelamento_recuperacoes (
+            taxa_cancelamento_id, corrida_recuperacao_id, passageiro_id, motorista_id, metodo, valor
+          ) VALUES ($1,$2,$3,$4,'dinheiro',$5)
+          ON CONFLICT (taxa_cancelamento_id, corrida_recuperacao_id) DO NOTHING;
+        `, [fee.id, corridaId, corrida.passageiro_id, motoristaId, recovered]);
+        await client.query(`
+          UPDATE movi_taxas_cancelamento
+          SET valor_recuperado = valor_recuperado + $1,
+              status = CASE WHEN valor_recuperado + $1 >= valor THEN 'liquidada' ELSE status END,
+              recuperado_em = CASE WHEN valor_recuperado + $1 >= valor THEN NOW() ELSE recuperado_em END,
+              corrida_reserva_id = NULL, atualizado_em = NOW()
+          WHERE id = $2;
+        `, [recovered, fee.id]);
+        await client.query(`
+          INSERT INTO movi_lancamentos_financeiros (
+            corrida_id, motorista_id, passageiro_id, tipo, valor, moeda, referencia_unica, metadata
+          ) VALUES ($1,$2,$3,'recuperacao_taxa_cancelamento_movi',$4,'BRL',$5,$6::jsonb)
+          ON CONFLICT (referencia_unica) WHERE referencia_unica IS NOT NULL DO NOTHING;
+        `, [corridaId, motoristaId, corrida.passageiro_id, recovered,
+          `corrida:${corridaId}:taxa_cancelamento:${fee.id}:recuperada`, JSON.stringify({ origem: 'pagamento_dinheiro_declarado_motorista', taxa_cancelamento_id: Number(fee.id) })]);
+        await client.query(`
+          INSERT INTO movi_lancamentos_financeiros (
+            corrida_id, motorista_id, passageiro_id, tipo, valor, moeda, referencia_unica, metadata
+          ) VALUES ($1,$2,$3,'baixa_debito_taxa_cancelamento',$4,'BRL',$5,$6::jsonb)
+          ON CONFLICT (referencia_unica) WHERE referencia_unica IS NOT NULL DO NOTHING;
+        `, [corridaId, motoristaId, corrida.passageiro_id, -recovered,
+          `corrida:${corridaId}:taxa_cancelamento:${fee.id}:baixa_passageiro`, JSON.stringify({ origem: 'liquidacao_taxa_cancelamento_em_dinheiro', taxa_cancelamento_id: Number(fee.id), valor_baixado: recovered })]);
+        remaining = Number((remaining - recovered).toFixed(2));
+      }
+      if (remaining > 0) throw new AppError('O débito reservado para esta corrida não corresponde ao valor recebido.', 409, 'CANCELLATION_DEBT_RESERVATION_MISMATCH');
+      await client.query(`
+        UPDATE movi_taxas_cancelamento SET corrida_reserva_id = NULL, atualizado_em = NOW()
+        WHERE corrida_reserva_id = $1 AND status = 'pendente';
+      `, [corridaId]);
+    } else if (debitoCancelamento > 0) {
+      // Partial or missing cash payment: release any unpaid amount for the next eligible ride.
+      await client.query(`
+        UPDATE movi_taxas_cancelamento SET corrida_reserva_id = NULL, atualizado_em = NOW()
+        WHERE corrida_reserva_id = $1 AND status = 'pendente';
+      `, [corridaId]);
+    }
+
+    if (taxaCancelamentoRecuperada > 0) {
+      const passengerResult = await client.query('SELECT debito_pendente FROM passageiros WHERE id = $1 FOR UPDATE', [corrida.passageiro_id]);
+      const currentDebt = Number(passengerResult.rows[0]?.debito_pendente || 0);
+      if (currentDebt + 0.001 < taxaCancelamentoRecuperada) throw new AppError('O saldo devedor do passageiro é menor que a recuperação registrada.', 409, 'PASSENGER_DEBT_MISMATCH');
+      await client.query(`
+        UPDATE passageiros SET debito_pendente = $1, atualizado_em = NOW() WHERE id = $2;
+      `, [Number((currentDebt - taxaCancelamentoRecuperada).toFixed(2)), corrida.passageiro_id]);
+    }
+
     const paymentStatus = statusFinal;
 
     const paymentResult = await client.query(`
-      INSERT INTO movi_pagamentos (corrida_id, passageiro_id, motorista_id, metodo, status, valor, valor_pago, moeda, atualizado_em, pago_em, metadata)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,'BRL',NOW(),CASE WHEN $5::varchar = 'pago'::varchar THEN NOW() ELSE NULL END,$8::jsonb)
+      INSERT INTO movi_pagamentos (
+        corrida_id, passageiro_id, motorista_id, metodo, status, valor, valor_pago, moeda,
+        atualizado_em, pago_em, metadata, tarifa_base, taxa_processamento,
+        debito_taxa_cancelamento, comissao_marketplace, versao_calculo_financeiro
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'BRL',NOW(),CASE WHEN $5::varchar = 'pago'::varchar THEN NOW() ELSE NULL END,$8::jsonb,$9,0,$10,$11,$12)
       ON CONFLICT (corrida_id) DO UPDATE SET
         motorista_id = EXCLUDED.motorista_id,
         metodo = EXCLUDED.metodo,
@@ -593,7 +725,12 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
         valor_pago = EXCLUDED.valor_pago,
         atualizado_em = NOW(),
         pago_em = EXCLUDED.pago_em,
-        metadata = EXCLUDED.metadata
+        metadata = EXCLUDED.metadata,
+        tarifa_base = EXCLUDED.tarifa_base,
+        taxa_processamento = EXCLUDED.taxa_processamento,
+        debito_taxa_cancelamento = EXCLUDED.debito_taxa_cancelamento,
+        comissao_marketplace = EXCLUDED.comissao_marketplace,
+        versao_calculo_financeiro = EXCLUDED.versao_calculo_financeiro
       RETURNING id;
     `, [
       corrida.id,
@@ -601,21 +738,26 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
       motoristaId,
       corrida.forma_pagamento,
       paymentStatus,
-      valorTotal,
+      totalDevido,
       Number(recebido || 0),
-      JSON.stringify({ origem: 'corrida.finalizar', observacao: observacao_pagamento || null }),
+      JSON.stringify({ origem: 'corrida.finalizar', observacao: observacao_pagamento || null, tarifa_base: valorTotal, debito_taxa_cancelamento: debitoCancelamento, debito_taxa_cancelamento_recuperado: taxaCancelamentoRecuperada }),
+      valorTotal,
+      debitoCancelamento,
+      Number(corrida.ganho_app || 0),
+      String(corrida.tarifa_versao || 'v1'),
     ]);
 
-    const finalizedRide = { ...corrida, motorista_id: motoristaId, status_pagamento: paymentStatus, valor_recebido_motorista: Number(recebido || 0) };
+    const finalizedRide = { ...corrida, motorista_id: motoristaId, status_pagamento: paymentStatus, valor_recebido_motorista: Number(recebido || 0), debito_taxa_cancelamento_recuperado: taxaCancelamentoRecuperada };
     await registrarLedgerCorrida(client, finalizedRide, paymentResult.rows[0]?.id || null);
 
     await client.query('COMMIT');
     const acertoParcial = corrida.forma_pagamento === 'dinheiro' && (statusFinal === 'parcial' || statusFinal === 'nao_pago')
-      ? calculateCashSettlement({ fare: valorTotal, received: Number(recebido || 0) })
+      ? calculateCashSettlement({ fare: valorTotal, received: valorRecebidoNaCorrida })
       : null;
     return {
       sucesso: true,
       mensagem: 'Corrida finalizada e acertos financeiros computados.',
+      debito_taxa_cancelamento_recuperado: taxaCancelamentoRecuperada,
       acerto_dinheiro: acertoParcial ? {
         valor_recebido: acertoParcial.received,
         debito_passageiro: acertoParcial.passengerDebt,
@@ -624,6 +766,7 @@ async function finalizarComPagamento(corridaId, motoristaId, dadosPagamento = {}
         adiantamento_motorista_previsto: acertoParcial.driverAdvance,
         protecao_nao_recuperavel_maxima: acertoParcial.protectionExposure,
         parcela_acima_do_teto_recuperavel: acertoParcial.advanceAboveProtectionCap,
+        debito_taxa_cancelamento_recuperado: taxaCancelamentoRecuperada,
         liquidacao_ao_motorista: 'nao_integrada',
       } : null,
     };
@@ -647,11 +790,24 @@ async function resumoParaUsuario({ tipo, id }) {
       COALESCE((SELECT SUM(-l.valor) FROM movi_lancamentos_financeiros l
         WHERE l.motorista_id = $1 AND l.tipo = 'repasse_motorista' AND l.valor < 0
           AND l.criado_em >= NOW() - INTERVAL '24 hours'), 0)::numeric(12,2) AS ganhos_ultimas_24h,
+      COALESCE((SELECT SUM(-l.valor) FROM movi_lancamentos_financeiros l
+        WHERE l.motorista_id = $1 AND l.tipo = 'repasse_motorista' AND l.valor < 0
+          AND l.metadata->>'liquidacao' = 'pendente'), 0)::numeric(12,2) AS repasse_pendente,
       COALESCE(SUM(valor) FILTER (WHERE status = 'concluida'), 0)::numeric(12,2) AS valor_total_corridas,
       CASE WHEN $2 = 'motorista' THEN (SELECT saldo_carteira FROM motoristas WHERE id = $1) ELSE NULL END AS saldo_carteira
     FROM corridas WHERE ${coluna} = $1;
   `, [id, tipo]);
   return rows[0];
+}
+
+async function debitoTaxaCancelamentoDisponivel(passageiroId) {
+  const { rows } = await pool.query(`
+    SELECT COALESCE(SUM(valor - valor_recuperado), 0)::numeric(12,2) AS valor
+    FROM movi_taxas_cancelamento
+    WHERE passageiro_id = $1 AND status = 'pendente' AND corrida_reserva_id IS NULL
+      AND valor > valor_recuperado;
+  `, [passageiroId]);
+  return Number(rows[0]?.valor || 0);
 }
 
 async function listarParaUsuario({ tipo, id, limit = 20, offset = 0 }) {
@@ -674,4 +830,5 @@ module.exports = {
   criar, buscarPorId, aceitar, criarOferta, listarOfertasPendentes, buscarOfertaPendente, recusarOferta,
   atualizarStatusControlado, iniciarComCodigoEmbarque, finalizarComPagamento, listarParaUsuario, resumoParaUsuario, assertFinancialSnapshot, registrarLedgerCorrida,
   deveBloquearNovaCorrida, deveBloquearCorridasEmDinheiro,
+  debitoTaxaCancelamentoDisponivel,
 };

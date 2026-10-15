@@ -13,6 +13,22 @@ test('HTTP smoke: health, not-found e CORS são determinísticos', async (t) => 
   const address = server.address();
   const base = `http://127.0.0.1:${address.port}`;
 
+  const home = await fetch(`${base}/`);
+  assert.equal(home.status, 200);
+  assert.match(home.headers.get('content-type'), /text\/html/i);
+  const homeHtml = await home.text();
+  assert.match(homeHtml, /MOVI — Sua cidade em movimento/);
+  assert.ok(homeHtml.includes('href="movi://"'));
+  assert.ok(homeHtml.includes('href="movi-motorista://"'));
+
+  const siteCss = await fetch(`${base}/site.css`);
+  assert.equal(siteCss.status, 200);
+  assert.match(siteCss.headers.get('content-type'), /text\/css/i);
+
+  const logo = await fetch(`${base}/assets/movi-logo-oficial.png`);
+  assert.equal(logo.status, 200);
+  assert.match(logo.headers.get('content-type'), /image\/png/i);
+
   const live = await fetch(`${base}/health/live`);
   assert.equal(live.status, 200);
   assert.equal((await live.json()).status, 'UP');

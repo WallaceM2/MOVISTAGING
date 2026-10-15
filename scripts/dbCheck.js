@@ -8,19 +8,20 @@ const requiredTables = [
   'movi_eventos_seguranca', 'movi_veiculos', 'movi_aceites_termos', 'movi_solicitacoes_titular',
   'movi_incidentes_seguranca', 'movi_lancamentos_financeiros', 'movi_saques_motoristas', 'movi_push_dispositivos',
   'movi_push_recibos', 'movi_compartilhamentos_corrida', 'movi_suporte_chamados', 'movi_suporte_mensagens',
-  'movi_taxas_cancelamento',
+  'movi_taxas_cancelamento', 'movi_taxas_cancelamento_recuperacoes',
   'movi_acertos_dinheiro', 'movi_schema_migrations',
 ];
 
 const requiredColumns = {
   motoristas: ['categoria', 'categoria_cnh', 'status_cadastro', 'status_conta', 'ear_confirmada', 'antecedentes_verificados', 'cnh_foto_url', 'documento_veiculo_url'],
   passageiros: ['status_conta', 'conta_verificada', 'debito_pendente'],
-  corridas: ['categoria', 'status', 'valor', 'ganho_app', 'ganho_motorista', 'percentual_comissao_app', 'percentual_repasse_motorista', 'tarifa_snapshot', 'valor_taxa_app', 'valor_repasse_motorista'],
+  corridas: ['categoria', 'status', 'valor', 'ganho_app', 'ganho_motorista', 'percentual_comissao_app', 'percentual_repasse_motorista', 'tarifa_snapshot', 'valor_taxa_app', 'valor_repasse_motorista', 'debito_taxa_cancelamento'],
   movi_tarifas: ['categoria', 'valor_por_km_cliente', 'tarifa_minima_cliente', 'piso_liquido_motorista_km', 'comissao_app_pct', 'repasse_motorista_pct'],
   movi_veiculos: ['motorista_id', 'categoria', 'placa', 'placa_normalizada', 'status', 'ativo'],
   movi_acertos_dinheiro: ['corrida_id', 'valor_total', 'valor_recebido', 'debito_passageiro', 'comissao_total', 'adiantamento_motorista', 'limite_protecao_nao_recuperavel', 'valor_recuperado', 'status_recuperacao'],
   ocorrencias_pagamento: ['resposta_passageiro', 'prazo_resposta_em', 'resposta_em', 'contestacao_descricao', 'suporte_chamado_id'],
-  movi_taxas_cancelamento: ['corrida_id', 'passageiro_id', 'motorista_id', 'valor', 'aceita_em', 'cancelada_em', 'status', 'repasse_status', 'creditado_carteira_em'],
+  movi_taxas_cancelamento: ['corrida_id', 'passageiro_id', 'motorista_id', 'valor', 'aceita_em', 'cancelada_em', 'status', 'repasse_status', 'creditado_carteira_em', 'corrida_reserva_id', 'valor_recuperado', 'recuperado_em'],
+  movi_taxas_cancelamento_recuperacoes: ['taxa_cancelamento_id', 'corrida_recuperacao_id', 'passageiro_id', 'motorista_id', 'metodo', 'valor'],
 };
 
 async function main() {

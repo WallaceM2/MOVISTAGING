@@ -8,6 +8,10 @@ const corridaSchema = z.object({
   forma_pagamento: z.enum(['dinheiro', 'cartao', 'pix']).default('dinheiro'),
 }).strict();
 
+const solicitarCorridaSchema = corridaSchema.extend({
+  cotacao_token: z.string().min(1).max(20000),
+});
+
 const finalizacaoSchema = z.object({
   status_pagamento: z.enum(['pago', 'parcial', 'nao_pago']),
   valor_recebido_motorista: z.coerce.number().min(0).nullable().optional(),
@@ -20,4 +24,4 @@ const codigoEmbarqueSchema = z.object({
 
 const avaliacao = idParamSchema;
 
-module.exports = { corridaSchema, finalizacaoSchema, codigoEmbarqueSchema, avaliacao };
+module.exports = { corridaSchema, solicitarCorridaSchema, finalizacaoSchema, codigoEmbarqueSchema, avaliacao };
