@@ -1,6 +1,6 @@
 module.exports = ({ config }) => ({
   ...config,
-  name: 'MOVI Motorista',
+  name: 'MOVI Drive',
   slug: 'movi-motorista',
   version: '1.0.0',
   orientation: 'portrait',

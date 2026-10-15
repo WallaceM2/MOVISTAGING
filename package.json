@@ -12,7 +12,8 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
-    "test:support-contract": "node --test tests/support-service.contract.test.cjs"
+    "test:support-contract": "node --test tests/support-service.contract.test.cjs",
+    "test:finance-contract": "node --test tests/driver-finance.contract.test.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.0",

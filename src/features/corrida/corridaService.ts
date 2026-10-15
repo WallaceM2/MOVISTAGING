@@ -10,6 +10,7 @@ export type RideOffer = {
   destino_lat: number;
   destino_lng: number;
   valor: number | string;
+  debito_taxa_cancelamento?: number | string;
   ganho_motorista: number | string;
   forma_pagamento: "dinheiro" | "cartao" | "pix";
   categoria: "moto" | "carro";
@@ -45,6 +46,7 @@ export type DriverStatement = {
   saldo_total: string | null;
   ganhos_acumulados: string | null;
   ganhos_ultimas_24h: string | null;
+  repasse_pendente: string | null;
   total_viagens: number;
   corridas_concluidas: number;
   valor_total_corridas: string;
@@ -60,6 +62,7 @@ export type CashSettlementSummary = {
   adiantamento_motorista_previsto: number;
   protecao_nao_recuperavel_maxima: number;
   parcela_acima_do_teto_recuperavel: number;
+  debito_taxa_cancelamento_recuperado?: number;
   liquidacao_ao_motorista: "nao_integrada";
 };
 

@@ -68,10 +68,10 @@ react {
  */
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
 def moviSigningEnv = [
-    storeFile: System.getenv('MOVI_ANDROID_KEYSTORE_PATH'),
-    storePassword: System.getenv('MOVI_ANDROID_KEYSTORE_PASSWORD'),
-    keyAlias: System.getenv('MOVI_ANDROID_KEY_ALIAS'),
-    keyPassword: System.getenv('MOVI_ANDROID_KEY_PASSWORD'),
+    storeFile: System.getenv('MOVI_ANDROID_KEYSTORE_PATH') ?: findProperty('moviAndroidKeystorePath')?.toString(),
+    storePassword: System.getenv('MOVI_ANDROID_KEYSTORE_PASSWORD') ?: findProperty('moviAndroidKeystorePassword')?.toString(),
+    keyAlias: System.getenv('MOVI_ANDROID_KEY_ALIAS') ?: findProperty('moviAndroidKeyAlias')?.toString(),
+    keyPassword: System.getenv('MOVI_ANDROID_KEY_PASSWORD') ?: findProperty('moviAndroidKeyPassword')?.toString(),
 ]
 def hasMoviReleaseSigning = moviSigningEnv.values().every { it != null && !it.trim().isEmpty() }
 
@@ -87,6 +87,14 @@ def hasMoviReleaseSigning = moviSigningEnv.values().every { it != null && !it.tr
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+def moviWindowsCmakeArguments = []
+if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+    moviWindowsCmakeArguments.add('-DCMAKE_OBJECT_PATH_MAX=1024')
+    def moviNinjaPath = System.getenv('MOVI_NINJA_PATH')
+    if (moviNinjaPath != null && !moviNinjaPath.trim().isEmpty()) {
+        moviWindowsCmakeArguments.add("-DCMAKE_MAKE_PROGRAM=${moviNinjaPath.replace('\\', '/')}")
+    }
+}
 
 android {
 // @generated begin @rnmapbox/maps-libcpp - expo prebuild (DO NOT MODIFY) sync-e24830a5a3e854b398227dfe9630aabfaa1cadd1
@@ -111,6 +119,12 @@ packagingOptions {
         versionName "1.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+
+        externalNativeBuild {
+            cmake {
+                arguments(*moviWindowsCmakeArguments)
+            }
+        }
 
     }
     signingConfigs {

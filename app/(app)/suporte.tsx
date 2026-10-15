@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppButton, Surface } from '@/components/ui';
+import { idempotencyKey } from '@/api/http';
 import { createSupportTicket, getSupportTicket, listSupportFaq, listSupportTickets, sendSupportMessage, triageSupportQuestion, type SupportCategory, type SupportStatus } from '@/features/support/supportService';
 import { palette } from '@/theme';
 
@@ -29,6 +30,8 @@ export default function SupportScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
+  const ticketOperation = useRef<{ fingerprint: string; key: string } | null>(null);
+  const messageOperation = useRef<{ fingerprint: string; key: string } | null>(null);
   const detail = useQuery({ queryKey: ['support-ticket', selectedId], queryFn: () => getSupportTicket(selectedId as number), enabled: selectedId !== null, refetchInterval: selectedId !== null ? 30000 : false, refetchIntervalInBackground: false });
 
   async function askSupport() {
@@ -47,9 +50,15 @@ export default function SupportScreen() {
     if (description.trim().length < 20) return Alert.alert('Conte o que aconteceu', 'A descrição precisa ter pelo menos 20 caracteres.');
     const ride = rideId.trim() ? Number(rideId.trim()) : undefined;
     if (ride !== undefined && (!Number.isSafeInteger(ride) || ride <= 0)) return Alert.alert('Número de corrida inválido', 'Informe somente o número da corrida.');
+    const input = { categoria: category, assunto: subject.trim(), mensagem: description.trim(), ...(ride ? { corrida_id: ride } : {}) };
+    const fingerprint = JSON.stringify(input);
+    if (!ticketOperation.current || ticketOperation.current.fingerprint !== fingerprint) {
+      ticketOperation.current = { fingerprint, key: idempotencyKey('support-ticket') };
+    }
     setCreating(true);
     try {
-      const result = await createSupportTicket({ categoria: category, assunto: subject.trim(), mensagem: description.trim(), ...(ride ? { corrida_id: ride } : {}) });
+      const result = await createSupportTicket(input, ticketOperation.current.key);
+      ticketOperation.current = null;
       setSubject(''); setRideId(''); setDescription(''); setComposerOpen(false); setSelectedId(result.chamado.id);
       await client.invalidateQueries({ queryKey: ['support-tickets'] });
       Alert.alert('Chamado recebido', `A previsão da primeira resposta humana é de ${result.previsao_resposta_humana_horas.minimo} a ${result.previsao_resposta_humana_horas.maximo} horas. Esse prazo é para a primeira resposta, não para a resolução do caso.`);
@@ -60,9 +69,14 @@ export default function SupportScreen() {
 
   async function submitReply() {
     if (selectedId === null || !reply.trim()) return;
+    const fingerprint = `${selectedId}:${reply.trim()}`;
+    if (!messageOperation.current || messageOperation.current.fingerprint !== fingerprint) {
+      messageOperation.current = { fingerprint, key: idempotencyKey('support-message') };
+    }
     setSending(true);
     try {
-      await sendSupportMessage(selectedId, reply.trim());
+      await sendSupportMessage(selectedId, reply.trim(), messageOperation.current.key);
+      messageOperation.current = null;
       setReply('');
       await Promise.all([client.invalidateQueries({ queryKey: ['support-ticket', selectedId] }), client.invalidateQueries({ queryKey: ['support-tickets'] })]);
     } catch (error) {

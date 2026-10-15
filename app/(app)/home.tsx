@@ -68,22 +68,24 @@ export default function DriverHome() {
     return unsubscribe;
   }, []);
   useEffect(() => {
+    if (!offer?.validadeCliente) return;
+    setClock(Date.now());
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [offer?.validadeCliente]);
   useEffect(() => {
     if (!approved) return;
     const socket = getSocket();
     if (!socket) return;
     const refreshOffers = () => { void getOffers().then((items) => { const active = items[0]; setOffer(active ? { ...active, validadeCliente: active.expira_em ? new Date(active.expira_em).getTime() : Date.now() + 30000 } : null); }).catch(() => undefined); };
-    const onConnect = () => setConnected(true);
+    const onConnect = () => { setConnected(true); refreshOffers(); };
     const onDisconnect = () => setConnected(false);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     setConnected(socket.connected);
     const unsubscribeRide = subscribeRideEvents({ nova_oferta_corrida: (payload) => setOffer(mapLiveOffer(payload)) });
-    if (socket.connected) refreshOffers(); else socket.once("connect", refreshOffers);
-    return () => { unsubscribeRide(); socket.off("connect", onConnect); socket.off("disconnect", onDisconnect); socket.off("connect", refreshOffers); };
+    if (socket.connected) refreshOffers();
+    return () => { unsubscribeRide(); socket.off("connect", onConnect); socket.off("disconnect", onDisconnect); };
   }, [approved]);
   useEffect(() => {
     if (!approved || !online) return;
@@ -99,10 +101,10 @@ export default function DriverHome() {
         // should not clear an offer that may still be accepted.
       }
     };
-    void refreshOffers();
-    const timer = setInterval(() => void refreshOffers(), 5000);
+    if (!connected) void refreshOffers();
+    const timer = setInterval(() => void refreshOffers(), connected ? 30000 : 5000);
     return () => { active = false; clearInterval(timer); };
-  }, [approved, online]);
+  }, [approved, online, connected]);
   useEffect(() => {
     if (!accessToken) return;
     const timer = setInterval(() => sendHeartbeat(), 25000);
@@ -194,6 +196,7 @@ export default function DriverHome() {
     {driver && !approved ? <Surface style={styles.pending}><View style={styles.pendingIcon}><MaterialCommunityIcons name="shield-lock-outline" size={23} color={palette.amber} /></View><View style={{ flex: 1, gap: 4 }}><Text style={styles.pendingTitle}>{driver.status_conta !== "ativa" ? "Conta temporariamente indisponível" : driver.status_cadastro === "reprovado" ? "Revise seu cadastro" : "Estamos analisando seu cadastro"}</Text><Text style={styles.pendingCopy}>{driver.status_conta !== "ativa" ? "Fale com o suporte para entender o status da conta." : driver.status_cadastro === "reprovado" ? "Confira os documentos e atualize o que estiver pendente." : "A equipe MOVI está conferindo suas informações e documentos."}</Text></View></Surface> : null}
     {cashBlocked ? <Surface style={styles.pending}><View style={styles.pendingIcon}><MaterialCommunityIcons name="cash-lock" size={23} color={palette.amber} /></View><View style={{ flex: 1, gap: 4 }}><Text style={styles.pendingTitle}>Corridas em dinheiro pausadas</Text><Text style={styles.pendingCopy}>Seu saldo da carteira atingiu -R$ 10,00. Você poderá receber corridas pagas pelo app até regularizar esse saldo.</Text></View></Surface> : null}
     <Surface style={[styles.balance, online && styles.balanceOnline]}><View style={styles.balanceTop}><View><Text style={styles.balanceLabel}>GANHOS NAS ÚLTIMAS 24H</Text><Text style={styles.balanceValue}>{money(statement.data?.ganhos_ultimas_24h)}</Text></View><View style={[styles.onlineBadge, { backgroundColor: online ? palette.lime : "#E8EEEA" }]}><View style={[styles.dot, { backgroundColor: online ? palette.forest : palette.muted }]} /><Text style={[styles.onlineText, online && { color: palette.forestDark }]}>{online ? "ONLINE" : "OFFLINE"}</Text></View></View><View style={styles.balanceDivider} /><View style={styles.metrics}><View><Text style={styles.metricValue}>{statement.data?.corridas_concluidas ?? 0}</Text><Text style={styles.metricLabel}>corridas concluídas</Text></View><View style={styles.metricSeparator} /><View><Text style={styles.metricValue}>{driver?.nota_media ? Number(driver.nota_media).toFixed(1) : "—"}<Text style={styles.star}> ★</Text></Text><Text style={styles.metricLabel}>avaliação média</Text></View><View style={styles.metricSeparator} /><View><Text style={styles.metricValue}>{money(statement.data?.saldo_total)}</Text><Text style={styles.metricLabel}>carteira</Text></View></View></Surface>
+    {Number(statement.data?.repasse_pendente ?? 0) > 0 ? <Text style={styles.pendingCopy}>Repasse pendente de acerto: {money(statement.data?.repasse_pendente)}. Esse valor ainda não está disponível na carteira.</Text> : null}
     <AppButton title={online ? "Ficar offline" : "Ficar online"} loading={busy} disabled={!approved || internet === false} onPress={() => void setOnlineStatus()} />
     <View style={styles.connection}><View style={[styles.connectionDot, { backgroundColor: internet === false ? palette.red : connected ? palette.forest : palette.amber }]} /><Text style={styles.connectionText}>{internet === false ? "Sem internet" : connected ? "Conectado ao MOVI" : "Conectando ao MOVI…"}</Text><Text style={styles.connectionHint}>•  {driver?.categoria === "carro" ? "Carro" : "Moto"}</Text></View>
     <DriverMap coordinate={coords} height={210} label={online ? "Você está visível para receber corridas" : "Sua localização só é usada quando você fica online"} />

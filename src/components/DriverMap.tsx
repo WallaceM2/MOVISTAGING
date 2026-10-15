@@ -4,7 +4,7 @@ import Mapbox from "@rnmapbox/maps";
 import { MAPBOX_TOKEN } from "@/config/env";
 import { palette } from "@/theme";
 
-export function DriverMap({ coordinate, height = 260, label = "Sua região" }: { coordinate: { lat: number; lng: number } | null; height?: number; label?: string }) {
+export const DriverMap = React.memo(function DriverMap({ coordinate, height = 260, label = "Sua região" }: { coordinate: { lat: number; lng: number } | null; height?: number; label?: string }) {
   const [mapReady, setMapReady] = useState(false);
   useEffect(() => {
     if (MAPBOX_TOKEN) void Mapbox.setAccessToken(MAPBOX_TOKEN).then(() => setMapReady(true)).catch(() => setMapReady(false));
@@ -28,7 +28,7 @@ export function DriverMap({ coordinate, height = 260, label = "Sua região" }: {
     </Mapbox.MapView>
     <View style={styles.mapLabel}><Text style={styles.mapLabelText}>{label}</Text></View>
   </View>;
-}
+});
 
 const styles = StyleSheet.create({
   map: { width: "100%", borderRadius: 24, overflow: "hidden", backgroundColor: "#E8EFE9" },

@@ -1,5 +1,5 @@
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-if (!configuredApiUrl) throw new Error('Configure EXPO_PUBLIC_API_URL no arquivo .env antes de iniciar o MOVI Motorista.');
+if (!configuredApiUrl) throw new Error('Configure EXPO_PUBLIC_API_URL no arquivo .env antes de iniciar o MOVI Drive.');
 let parsedApiUrl: URL;
 try { parsedApiUrl = new URL(configuredApiUrl); } catch { throw new Error('EXPO_PUBLIC_API_URL precisa ser uma URL válida.'); }
 if (!['http:', 'https:'].includes(parsedApiUrl.protocol) || parsedApiUrl.username || parsedApiUrl.password || parsedApiUrl.search || parsedApiUrl.hash) {
