@@ -5,7 +5,7 @@ module.exports = ({ config }) => ({
   version: '1.0.0',
   orientation: 'portrait',
   scheme: 'movi-motorista',
-  userInterfaceStyle: 'light',
+  userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   ios: {
     ...(config.ios || {}),
@@ -29,6 +29,7 @@ module.exports = ({ config }) => ({
     ['expo-location', { locationWhenInUsePermission: 'O MOVI usa sua localização enquanto você está online ou durante uma corrida ativa.', locationAlwaysAndWhenInUsePermission: 'Quando você fica online ou está em uma corrida, o MOVI compartilha sua localização para manter ofertas e acompanhamento funcionando com a tela bloqueada.', isIosBackgroundLocationEnabled: true, isAndroidBackgroundLocationEnabled: true, isAndroidForegroundServiceEnabled: true }],
     ['expo-notifications', { defaultChannel: 'rides' }],
     ['expo-image-picker', { photosPermission: 'O MOVI precisa de acesso às suas fotos para enviar documentos de cadastro.' }],
+    ['expo-audio', { microphonePermission: 'O MOVI usa o microfone somente quando você grava uma mensagem de voz no chat da corrida.', recordAudioAndroid: true }],
     '@rnmapbox/maps',
   ],
   extra: {

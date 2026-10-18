@@ -6,6 +6,8 @@ import { useAuthStore } from "@/store/authStore";
 import { AppProviders } from "@/providers";
 import { disconnectSocket } from "@/realtime/socket";
 import { subscribePushOpensRide } from "@/features/push/pushService";
+import { ThemeProvider } from "@/theme/ThemeProvider";
+import { useMoviTheme } from "@/theme/ThemeProvider";
 import "@/location/backgroundLocation";
 
 export default function RootLayout() {
@@ -22,5 +24,7 @@ export default function RootLayout() {
   useEffect(() => { if (!token) disconnectSocket(); }, [token]);
   useEffect(() => subscribePushOpensRide((rideId) => router.push({ pathname: "/(app)/corrida", params: { id: String(rideId) } })), []);
 
-  return <SafeAreaProvider><AppProviders><Stack screenOptions={{ headerShown: false, animation: "fade" }} /></AppProviders></SafeAreaProvider>;
+  return <SafeAreaProvider><ThemeProvider><AppProviders><ThemedStack /></AppProviders></ThemeProvider></SafeAreaProvider>;
 }
+
+function ThemedStack() { const { colors } = useMoviTheme(); return <Stack screenOptions={{ headerShown: false, animation: "fade", contentStyle: { backgroundColor: colors.bg } }} />; }

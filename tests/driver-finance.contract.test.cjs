@@ -49,6 +49,31 @@ test('extrato preserva ganhos, carteira e repasse pendente em campos separados',
   assert.equal(result.ganhos_ultimas_24h, '34.00');
   assert.equal(result.repasse_pendente, '24.00');
   assert.equal(result.saldo_total, '-3.00');
-  assert.match(fs.readFileSync(path.join(__dirname, '../app/(app)/home.tsx'), 'utf8'), /não está disponível na carteira/);
-  assert.match(fs.readFileSync(path.join(__dirname, '../app/(app)/historico.tsx'), 'utf8'), /não faz parte do saldo disponível da carteira/);
+  const home = fs.readFileSync(path.join(__dirname, '../app/(app)/home.tsx'), 'utf8');
+  const statement = fs.readFileSync(path.join(__dirname, '../app/(app)/historico.tsx'), 'utf8');
+  const menu = fs.readFileSync(path.join(__dirname, '../src/components/DriverMenuDrawer.tsx'), 'utf8');
+  assert.match(home, /GANHOS NAS ÚLTIMAS 24H/);
+  assert.match(home, /statement\.data\?\.ganhos_ultimas_24h/);
+  assert.match(statement, /GANHOS NAS ÚLTIMAS 24H/);
+  assert.match(statement, /não faz parte do saldo disponível da carteira/);
+  assert.match(menu, /Meus ganhos[\s\S]*navigate\("\/\(app\)\/meus-ganhos"\)/);
+});
+
+test('Meus ganhos prepara cadastro e PIN, sem alegar saque Pix concluído', () => {
+  const screen = fs.readFileSync(path.join(__dirname, '../app/(app)/meus-ganhos.tsx'), 'utf8');
+  const payoutService = fs.readFileSync(path.join(__dirname, '../src/features/financeiro/saqueService.ts'), 'utf8');
+  assert.match(payoutService, /\/api\/motoristas\/recebimento/);
+  assert.match(payoutService, /\/api\/motoristas\/saques\/pin/);
+  assert.match(screen, /Solicitar saque · indisponível/);
+  assert.match(screen, /armazenados cifrados/);
+  assert.doesNotMatch(screen, /PIX ENVIADO COM SUCESSO/);
+  assert.doesNotMatch(screen, /Movimentações de corridas/);
+});
+
+test('Radar exibe badge vermelho com quantidade real consultada no V3', () => {
+  const layout = fs.readFileSync(path.join(__dirname, '../app/(app)/_layout.tsx'), 'utf8');
+  assert.match(layout, /queryFn: getRadarRides/);
+  assert.match(layout, /tabBarBadge: radarBadge/);
+  assert.match(layout, /#E53945/);
+  assert.match(layout, /name !== "radar"/);
 });

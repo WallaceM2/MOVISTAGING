@@ -25,6 +25,7 @@ export type Ride = RideOffer & {
   passageiro_id: number;
   motorista_id: number | null;
   status: RideStatus;
+  motorista_chegou_em?: string | null;
   codigo_embarque?: string;
   status_pagamento?: "pago" | "parcial" | "nao_pago" | "pendente";
   valor_recebido_motorista?: number | string | null;
@@ -71,6 +72,23 @@ export async function getOffers() {
   return response.ofertas ?? [];
 }
 
+export async function getRadarRides() {
+  const response = await apiFetch<{ corridas: RideOffer[] }>("/api/corridas/radar");
+  return response.corridas ?? [];
+}
+
+export function acceptRadarRide(id: number) {
+  return apiFetch<{ mensagem: string; corrida: Ride }>(`/api/corridas/${id}/aceitar-radar`, {
+    method: "POST",
+    idempotencyKey: idempotencyKey(`ride-${id}-radar-accept`),
+  });
+}
+
+export async function getActiveRide() {
+  const response = await apiFetch<{ corrida: Ride | null }>("/api/corridas/ativa");
+  return response.corrida;
+}
+
 export function acceptRide(id: number) {
   return apiFetch<{ mensagem: string; corrida: Ride }>(`/api/corridas/${id}/aceitar`, {
     method: "POST",
@@ -94,6 +112,13 @@ export function startRide(id: number, codigoEmbarque: string) {
     method: "POST",
     body: JSON.stringify({ codigo_embarque: codigoEmbarque }),
     idempotencyKey: idempotencyKey(`ride-${id}-start`),
+  });
+}
+
+export function markArrival(id: number) {
+  return apiFetch<{ mensagem: string; corrida: Ride }>(`/api/corridas/${id}/cheguei`, {
+    method: "POST",
+    idempotencyKey: idempotencyKey(`ride-${id}-arrival`),
   });
 }
 

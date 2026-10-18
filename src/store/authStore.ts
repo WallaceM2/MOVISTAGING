@@ -18,6 +18,17 @@ export type Driver = {
   ultima_lng?: number | null;
   nota_media?: number | null;
   total_avaliacoes?: number | null;
+  criado_em?: string;
+  desempenho?: {
+    limite_amostra: number;
+    aceitas: number;
+    ofertas_consideradas: number;
+    taxa_aceitacao_pct: number | string | null;
+    concluidas: number;
+    corridas_consideradas: number;
+    taxa_finalizacao_pct: number | string | null;
+    calculado_em: string;
+  };
   saldo_carteira?: number | null;
   bloqueado_dinheiro?: boolean;
   veiculo?: { id: number; categoria: "moto" | "carro"; placa: string; marca?: string | null; modelo?: string | null; cor?: string | null; ano_modelo?: number | null; status: string } | null;
