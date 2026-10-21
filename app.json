@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "movi-motorista",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "br.com.movi.motorista"

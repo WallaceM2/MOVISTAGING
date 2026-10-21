@@ -41,7 +41,7 @@ export default function DriverEarningsScreen() {
   return <ScrollView style={styles.page} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={statement.isRefetching || payout.isRefetching} onRefresh={() => { void statement.refetch(); void payout.refetch(); }} tintColor={palette.forest} />}>
     <Text style={styles.eyebrow}>SUA VIDA FINANCEIRA</Text><Text style={styles.title}>Meus ganhos</Text><Text style={styles.subtitle}>Resumo da carteira e configuração do recebimento.</Text>
     {statement.isLoading ? <ActivityIndicator color={palette.forest} /> : null}
-    {statement.isError ? <Surface style={styles.infoCard}><Text style={styles.cardTitle}>Não foi possível carregar seus ganhos</Text><Text style={styles.body}>O saldo só é exibido após confirmação do MOVI V3. Atualize para tentar novamente.</Text><Pressable onPress={() => void statement.refetch()}><Text style={styles.link}>Tentar novamente</Text></Pressable></Surface> : <Surface style={styles.earningsCard}>
+    {statement.isError ? <Surface style={styles.infoCard}><Text style={styles.cardTitle}>Não foi possível carregar seus ganhos</Text><Text style={styles.body}>O saldo aparecerá quando os dados financeiros forem confirmados. Atualize para tentar novamente.</Text><Pressable onPress={() => void statement.refetch()}><Text style={styles.link}>Tentar novamente</Text></Pressable></Surface> : <Surface style={styles.earningsCard}>
       <View style={styles.cardHeading}><View style={styles.iconBox}><MaterialCommunityIcons name="wallet-outline" size={21} color={palette.forest} /></View><Text style={styles.totalLabel}>GANHOS NAS ÚLTIMAS 24H</Text></View>
       <Text style={styles.totalValue}>{money(statement.data?.ganhos_ultimas_24h)}</Text>
       <Text style={styles.bodyOnDark}>Ganhos acumulados: {money(statement.data?.ganhos_acumulados)}</Text>
@@ -54,7 +54,7 @@ export default function DriverEarningsScreen() {
     <Surface style={styles.infoCard}>
       <View style={styles.cardHeading}><MaterialCommunityIcons name="shield-lock-outline" size={21} color={palette.forest} /><Text style={styles.cardTitle}>Dados de recebimento</Text></View>
       {payout.isLoading ? <ActivityIndicator color={palette.forest} /> : null}
-      {payout.isError ? <Text style={styles.body}>Não foi possível consultar os dados de recebimento.</Text> : payout.data?.conta ? <View style={styles.savedAccount}><Text style={styles.savedLine}>Pix · {payout.data.conta.chave_pix_mascarada}</Text><Text style={styles.body}>Conta · {payout.data.conta.conta_mascarada || "não informada"}</Text><Text style={styles.body}>PIN de saque · {payout.data.conta.pin_configurado ? "configurado" : "não configurado"}</Text></View> : <Text style={styles.body}>Cadastre sua chave Pix e os dados bancários. Eles serão enviados ao V3 por conexão autenticada e armazenados cifrados.</Text>}
+      {payout.isError ? <Text style={styles.body}>Não foi possível consultar os dados de recebimento.</Text> : payout.data?.conta ? <View style={styles.savedAccount}><Text style={styles.savedLine}>Pix · {payout.data.conta.chave_pix_mascarada}</Text><Text style={styles.body}>Conta · {payout.data.conta.conta_mascarada || "não informada"}</Text><Text style={styles.body}>PIN de saque · {payout.data.conta.pin_configurado ? "configurado" : "não configurado"}</Text></View> : <Text style={styles.body}>Cadastre sua chave Pix e os dados bancários. Essas informações são protegidas e usadas para processar seus recebimentos.</Text>}
       <Pressable accessibilityRole="button" onPress={() => setAccountFormOpen((open) => !open)} style={styles.outlineButton}><MaterialCommunityIcons name={accountFormOpen ? "close" : "bank-plus"} size={18} color={palette.forest} /><Text style={styles.outlineText}>{accountFormOpen ? "Fechar cadastro" : payout.data?.conta ? "Alterar dados" : "Cadastrar dados Pix e conta"}</Text></Pressable>
       {accountFormOpen ? <View style={styles.form}>
         <Text style={styles.fieldLabel}>Tipo de chave Pix</Text>
@@ -76,7 +76,7 @@ export default function DriverEarningsScreen() {
         <Pressable accessibilityRole="button" disabled={busy} onPress={submitPin} style={[styles.outlineButton, busy && styles.disabled]}>{pinMutation.isPending ? <ActivityIndicator color={palette.forest} /> : <><MaterialCommunityIcons name="lock-check-outline" size={18} color={palette.forest} /><Text style={styles.outlineText}>{payout.data.conta.pin_configurado ? "Alterar PIN" : "Configurar PIN"}</Text></>}</Pressable>
         {pinMutation.isError ? <Text style={styles.errorText}>{pinMutation.error.message}</Text> : null}
       </>}
-      <Text style={styles.securityNote}>O PIN não é armazenado no aparelho. O V3 guarda apenas uma versão protegida e bloqueia tentativas repetidas.</Text>
+      <Text style={styles.securityNote}>O PIN não fica salvo neste aparelho, e tentativas repetidas são limitadas por segurança.</Text>
     </Surface>
 
     <Surface style={styles.unavailableCard}><View style={styles.cardHeading}><MaterialCommunityIcons name="clock-alert-outline" size={20} color={palette.amber} /><Text style={styles.cardTitle}>Saques ainda indisponíveis</Text></View><Text style={styles.body}>A integração de pagamentos/repasse ainda não está ativa. Não é possível solicitar, liquidar ou confirmar uma transferência Pix agora.</Text><Pressable accessibilityRole="button" disabled style={[styles.primaryButton, styles.disabled]}><Text style={styles.primaryText}>Solicitar saque · indisponível</Text></Pressable></Surface>
@@ -134,3 +134,4 @@ function createStyles(palette: DriverPalette) { return StyleSheet.create({
   footnote: { color: palette.muted, fontSize: 12, lineHeight: 18, textAlign: "center", paddingHorizontal: 5 },
   link: { color: palette.forest, fontSize: 14, lineHeight: 19, fontWeight: "900" },
 }); }
+

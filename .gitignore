@@ -18,3 +18,5 @@ coverage/
 *.log
 *.p12
 *.mobileprovision
+
+/MOVI-MTA-release.apk

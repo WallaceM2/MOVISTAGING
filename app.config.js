@@ -6,7 +6,6 @@ module.exports = ({ config }) => ({
   orientation: 'portrait',
   scheme: 'movi-motorista',
   userInterfaceStyle: 'automatic',
-  newArchEnabled: true,
   ios: {
     ...(config.ios || {}),
     supportsTablet: false,
@@ -20,6 +19,8 @@ module.exports = ({ config }) => ({
   android: {
     ...(config.android || {}),
     package: 'br.com.movi.motorista',
+    allowBackup: false,
+    blockedPermissions: ['android.permission.SYSTEM_ALERT_WINDOW'],
     ...(process.env.GOOGLE_SERVICES_JSON ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON } : {}),
     permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION', 'ACCESS_BACKGROUND_LOCATION', 'FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_LOCATION', 'POST_NOTIFICATIONS'],
   },
