@@ -6,6 +6,7 @@ const EXPO_RECEIPTS_URL = 'https://exp.host/--/api/v2/push/getReceipts';
 const notices = {
   nova_oferta_corrida: { title: 'Nova oportunidade no MOVI', body: 'Abra o app para conferir a oferta.' },
   corrida_aceita: { title: 'Motorista a caminho', body: 'Seu motorista aceitou a corrida.' },
+  motorista_chegou: { title: 'Seu motorista chegou', body: 'O motorista está aguardando no local de embarque. Abra o MOVI para acompanhar o tempo de espera.' },
   corrida_iniciada: { title: 'Corrida iniciada', body: 'Sua viagem está em andamento.' },
   corrida_finalizada: { title: 'Corrida concluída', body: 'Sua viagem foi finalizada.' },
   corrida_cancelada: { title: 'Corrida cancelada', body: 'Abra o MOVI para consultar o status.' },

@@ -1,12 +1,12 @@
 const APP_DESTINATIONS = Object.freeze({
   passageiro: Object.freeze({
-    deepLink: 'movi://',
+    deepLink: null,
     androidStore: null,
     iosStore: null,
     qrImage: null,
   }),
   parceiro: Object.freeze({
-    deepLink: 'movi-motorista://',
+    deepLink: null,
     androidStore: null,
     iosStore: null,
     qrImage: null,
@@ -95,7 +95,7 @@ document.querySelectorAll('[data-app-launch]').forEach((link) => {
     const status = appStatusFor(link);
     if (!destination) return;
 
-    if (!isMobileDevice) {
+    if (!isMobileDevice || (!destination.deepLink && !destination.androidStore && !destination.iosStore)) {
       event.preventDefault();
       showAppAccess(appKey, status, 'Os apps ainda não foram publicados nas lojas. Os links oficiais e o QR Code serão adicionados aqui quando estiverem disponíveis.');
       return;
@@ -114,6 +114,18 @@ document.querySelectorAll('[data-app-launch]').forEach((link) => {
       showAppAccess(appKey, status, 'Não foi possível abrir o aplicativo. Os links oficiais para instalação serão publicados quando os apps chegarem às lojas.');
     }, 1300);
 
+    if (!destination.deepLink) {
+      const directStoreUrl = mobilePlatform === 'android' ? destination.androidStore : mobilePlatform === 'ios' ? destination.iosStore : null;
+      window.clearTimeout(fallbackTimer);
+      if (directStoreUrl) {
+        fallbackStarted = true;
+        window.location.assign(directStoreUrl);
+      } else {
+        showAppAccess(appKey, status, 'Os apps ainda não foram publicados nas lojas. Os links oficiais e o QR Code serão adicionados aqui quando estiverem disponíveis.');
+      }
+      return;
+    }
+
     window.location.assign(destination.deepLink);
     window.addEventListener('pagehide', () => window.clearTimeout(fallbackTimer), { once: true });
     window.addEventListener('blur', () => window.clearTimeout(fallbackTimer), { once: true });
@@ -130,14 +142,15 @@ let faqArticles = [];
 
 function renderFaq(articles) {
   if (!faqList) return;
-  const term = (faqSearch?.value || '').trim().toLocaleLowerCase('pt-BR');
-  const filtered = articles.filter((article) => `${article.titulo} ${article.resposta}`.toLocaleLowerCase('pt-BR').includes(term));
+  const normalizeSearch = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const term = normalizeSearch(faqSearch?.value || '');
+  const filtered = articles.filter((article) => normalizeSearch(article.titulo + ' ' + article.resposta).includes(term));
   faqList.replaceChildren();
 
   if (!filtered.length) {
     const empty = document.createElement('p');
     empty.className = 'faq-state';
-    empty.textContent = term ? 'Nenhum artigo do V3 corresponde à busca.' : 'A Central de Ajuda ainda não tem artigos publicados.';
+    empty.textContent = term ? 'Nenhuma orientação corresponde à busca.' : 'A Central de Ajuda ainda não tem artigos publicados.';
     faqList.append(empty);
     return;
   }
@@ -159,7 +172,7 @@ async function loadFaq() {
   if (!faqList) return;
   try {
     const response = await fetch('/api/suporte/faq', { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`V3 respondeu ${response.status}`);
+    if (!response.ok) throw new Error(`Resposta ${response.status}`);
     const payload = await response.json();
     faqArticles = Array.isArray(payload.artigos) ? payload.artigos : [];
     renderFaq(faqArticles);
@@ -167,7 +180,7 @@ async function loadFaq() {
     faqList.replaceChildren();
     const message = document.createElement('p');
     message.className = 'faq-state faq-state-error';
-    message.textContent = 'Não foi possível conectar à Central de Ajuda do MOVI V3. Abra esta página pelo servidor do MOVI para carregar os artigos oficiais.';
+    message.textContent = 'Não foi possível carregar as orientações agora. Tente novamente mais tarde.';
     faqList.append(message);
   }
 }

@@ -16,6 +16,7 @@ const idSchema = z.object({ id: z.coerce.number().int().positive() });
 
 const adminOnly = [verificarToken, permitirTipo('admin'), exigirContaAtiva];
 router.post('/admin/login', limiteAuth, validar(loginSchema), asyncHandler(adminController.login));
+router.post('/admin/logout', asyncHandler(adminController.logout));
 router.get('/admin/dashboard', ...adminOnly, asyncHandler(adminController.dashboard));
 router.get('/admin/motoristas', ...adminOnly, asyncHandler(adminController.listarMotoristas));
 router.get('/admin/passageiros', ...adminOnly, asyncHandler(adminController.listarPassageiros));

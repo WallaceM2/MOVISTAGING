@@ -54,4 +54,22 @@ const limiteAuth = createRateLimiter({
   failClosed: true,
 });
 
-module.exports = { limiteGeral, limiteAuth };
+const limiteRecuperacaoSenha = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  keyPrefix: 'password-recovery',
+  keyBuilder: (req) => `${req.ip}:${String(req.body?.tipo_usuario || '')}:${String(req.body?.metodo || '')}:${String(req.body?.destino || req.body?.challenge_id || '')}`,
+  message: 'Muitas solicitações de recuperação. Tente novamente mais tarde.',
+  failClosed: true,
+});
+
+const limiteChat = createRateLimiter({
+  windowMs: 60_000,
+  max: 60,
+  keyPrefix: 'ride-chat',
+  keyBuilder: (req) => `${req.usuario?.tipo || 'anonymous'}:${req.usuario?.id || req.ip}`,
+  message: 'Muitas mensagens em pouco tempo. Aguarde um instante para enviar outra.',
+  failClosed: env.isProduction,
+});
+
+module.exports = { limiteGeral, limiteAuth, limiteRecuperacaoSenha, limiteChat };

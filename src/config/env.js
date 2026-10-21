@@ -310,6 +310,10 @@ const env = Object.freeze({
 
   PAYMENT_PROVIDER:
     process.env.PAYMENT_PROVIDER || 'none',
+  PAYOUT_PROVIDER:
+    process.env.PAYOUT_PROVIDER || 'none',
+  FINANCIAL_DATA_ENCRYPTION_KEY:
+    process.env.FINANCIAL_DATA_ENCRYPTION_KEY || '',
 
   // Mercado Pago marketplace OAuth/Payments. These remain optional until a
   // sandbox rollout is explicitly configured; never use the platform token
@@ -324,6 +328,15 @@ const env = Object.freeze({
   // Hard gate: no environment flag can turn checkout on before the end-to-end
   // payment, fee schedule, refund and mobile tokenization flows are complete.
   MP_CHECKOUT_ENABLED: false,
+
+  // Password recovery delivery providers. Keep credentials out of app bundles.
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  PASSWORD_RECOVERY_EMAIL_FROM: process.env.PASSWORD_RECOVERY_EMAIL_FROM || '',
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
+  TWILIO_API_KEY_SID: process.env.TWILIO_API_KEY_SID || '',
+  TWILIO_API_KEY_SECRET: process.env.TWILIO_API_KEY_SECRET || '',
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
+  TWILIO_FROM_NUMBER: process.env.TWILIO_FROM_NUMBER || '',
 
   SHARE_PUBLIC_BASE_URL:
     process.env.SHARE_PUBLIC_BASE_URL || '',
@@ -414,19 +427,19 @@ const env = Object.freeze({
   // Documentos legais
   TERMS_PASSENGER_VERSION:
     process.env.TERMS_PASSENGER_VERSION ||
-    '1.0',
+    '2.1',
 
   TERMS_DRIVER_VERSION:
     process.env.TERMS_DRIVER_VERSION ||
-    '1.0',
+    '2.1',
 
   PRIVACY_VERSION:
     process.env.PRIVACY_VERSION ||
-    '1.0',
+    '2.1',
 
   SAFETY_POLICY_VERSION:
     process.env.SAFETY_POLICY_VERSION ||
-    '1.0',
+    '2.0',
 
   // Segurança / operação
   AUTO_SUSPEND_ON_SERIOUS_REPORT:
@@ -532,3 +545,5 @@ if (isProduction && env.SERVICE_KIND === 'web') {
 }
 
 module.exports = env;
+
+

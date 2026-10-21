@@ -1,76 +1,62 @@
-# Termos de Uso — Movi Passageiro
+# Termos de Uso e Serviços — MOVI Passageiro
 
-**Versão:** 1.0 — minuta para revisão jurídica
-**Vigência prevista:** [PREENCHER]
-**Empresa responsável:** [RAZÃO SOCIAL]
-**CNPJ:** [PREENCHER]
-**Endereço:** [PREENCHER]
-**Atendimento:** [E-MAIL / TELEFONE / CHAT]
+**Versão:** 2.1  
+**Atualizado em:** 19/10/2026  
+**Operador da plataforma:** Demilly R. M. Mendes, pessoa física — CPF ***.***.***-13  
+**Endereço para contato:** Rua Bela Vista, nº 155, Xique-Xique, Caruaru/PE, CEP 55103-000  
+**Atendimento e privacidade:** supportmovi@gmail.com
 
-## 1. Objeto
+## 1. Sobre o MOVI
 
-O Movi é uma plataforma digital destinada à solicitação e gestão de serviços de mobilidade individual remunerada, conectando usuários previamente cadastrados a motoristas/parceiros habilitados na plataforma e na legislação aplicável.
+O MOVI é uma plataforma digital de mobilidade urbana que licencia e disponibiliza aplicativos para conectar passageiros a motoristas parceiros independentes. O passageiro solicita uma viagem pelo app; o motorista decide se aceita e, ao aceitar, realiza o transporte.
 
-A disponibilidade de determinada categoria, região, horário, meio de pagamento ou serviço depende da área de operação e das regras aplicáveis no local.
+A MOVI não conduz o veículo nem executa diretamente o transporte. O funcionamento depende de disponibilidade de motoristas, conexão, localização, recursos habilitados e regras aplicáveis à cidade.
 
-## 2. Cadastro e conta
+## 2. Conta e cadastro
 
-O usuário deve fornecer dados verdadeiros, atuais e completos. O acesso é pessoal e não pode ser cedido. O Movi poderá solicitar mecanismos de verificação de identidade, telefone, documentos ou outros dados necessários à prevenção de fraude, segurança e cumprimento de obrigações legais.
+Para criar uma conta, o passageiro deve fornecer informações corretas, manter seus dados atualizados e proteger suas credenciais. A conta é pessoal e não deve ser compartilhada. O cadastro e o uso estão sujeitos aos critérios de elegibilidade exibidos no aplicativo e às regras aplicáveis.
 
-A idade mínima de uso do serviço será de 18 anos, salvo se regra jurídica específica e aprovação formal da empresa estabelecerem outra condição.
+O passageiro deve conferir os dados da corrida e do motorista antes do embarque. Não deve solicitar que o motorista viole leis de trânsito, transporte ou segurança.
 
-## 3. Solicitação de corrida
+## 3. Solicitação e realização da viagem
 
-Antes da confirmação, o aplicativo deverá apresentar ao usuário, sempre que tecnicamente possível, a categoria escolhida, origem, destino, estimativa de valor, forma de pagamento e informações relevantes sobre a viagem.
+O aplicativo pode permitir informar embarque por localização do dispositivo ou manualmente, inserir destino, escolher entre as categorias disponíveis e consultar uma estimativa antes de confirmar. A estimativa final, categoria, método de pagamento e demais condições devem ser conferidos na tela de confirmação.
 
-O valor final pode sofrer alterações somente nas hipóteses claramente apresentadas ao usuário antes ou durante a viagem, conforme as regras publicadas no aplicativo e a legislação aplicável.
+Uma solicitação ainda não é uma corrida aceita. A busca pode não encontrar motorista. Após o aceite, o app apresenta os dados disponíveis do motorista e do veículo e o estado da viagem. O passageiro deve embarcar somente no veículo e com o motorista identificados no aplicativo.
 
-## 4. Categorias
+A MOVI poderá cancelar, interromper ou limitar uma solicitação em caso de indisponibilidade, falha técnica, risco ou exigência aplicável, informando o que for possível.
 
-O usuário poderá escolher entre categorias disponibilizadas em sua região, como carro e moto. Uma solicitação de uma categoria somente será encaminhada a parceiros habilitados para aquela mesma categoria.
+## 4. Preços, pagamentos e valores pendentes
 
-## 5. Pagamentos
+O preço e o método de pagamento apresentados antes da confirmação são os aplicáveis à solicitação, ressalvadas alterações que sejam autorizadas e confirmadas conforme o fluxo do aplicativo. Só considere disponível o método de pagamento que o app oferecer efetivamente naquela etapa.
 
-Os pagamentos digitais serão processados pelo provedor indicado no aplicativo. O Movi não deve declarar uma transação como paga enquanto não houver confirmação do respectivo provedor.
+No pagamento em dinheiro, o valor é entregue diretamente ao motorista e pode ser registrado no app. Divergências, pagamentos parciais, valores não recebidos e débitos devem permanecer vinculados à corrida e podem ser encaminhados para análise. O aplicativo informa restrições por saldo pendente e os meios de contestação ou suporte disponíveis. Uma tela do app, por si só, não comprova a liquidação de pagamento digital.
 
-Em pagamentos em dinheiro, o usuário deve entregar o valor efetivamente devido ao motorista. Em caso de pagamento parcial ou não pagamento, poderão ser aplicadas as regras de débito, contestação e bloqueio previstas neste instrumento e no aplicativo, observados os direitos do consumidor.
+## 5. Cancelamento
 
-## 6. Cancelamentos
+Se um motorista já aceitou a corrida e o passageiro solicitar o cancelamento **180 segundos ou mais após o aceite**, o aplicativo informará a taxa de cancelamento de **R$ 3,00 antes da confirmação**. Sem motorista que tenha aceitado a corrida, essa taxa não se aplica. O lançamento e a possibilidade de contestação ficam vinculados à corrida e seguem o estado registrado pelo MOVI V3.
 
-Cancelamentos e eventuais cobranças de taxa devem seguir critérios objetivos publicados no aplicativo, incluindo, conforme o caso, estágio da viagem, tempo de espera, deslocamento do motorista e motivo informado.
+O motorista pode cancelar quando as condições operacionais apresentadas no app forem atendidas. O passageiro deve consultar a mensagem e o estado exibidos no momento da ação.
 
-## 7. Segurança e confiança
+## 6. Segurança, emergências e seguros
 
-O Movi poderá disponibilizar mecanismos como identificação do motorista e veículo, código de embarque, compartilhamento da viagem, canais de suporte, denúncia e resposta a incidentes. A lista exata de recursos depende da versão do aplicativo e da região.
+O MOVI é um aplicativo de mobilidade urbana, não um serviço de emergência e não oferece seguro de vida nem cobertura securitária própria da plataforma como benefício incluído na corrida. O app pode exibir recursos de segurança que estejam realmente habilitados; eles não substituem os serviços públicos de emergência.
 
-Em situação de emergência, o usuário deve priorizar os serviços públicos de emergência e os canais indicados no aplicativo.
+O motorista parceiro é responsável pela condução, pelo veículo, pela execução material do transporte e por verificar e cumprir os requisitos legais e securitários aplicáveis à sua atividade e localidade. A MOVI não oferece seguro patrimonial para o veículo do parceiro nem promete indenização por roubo, furto, colisão ou outros danos. A ausência de comprovante de seguro no cadastro não altera exigências que sejam aplicáveis à operação.
 
-## 8. Condutas proibidas
+Em situação de risco imediato, procure os serviços públicos de emergência. Para dúvidas, reclamações ou contestação de uma corrida, use o suporte no aplicativo ou escreva para supportmovi@gmail.com.
 
-É vedado utilizar a plataforma para fraude, assédio, ameaça, violência, discriminação, transporte de itens ilícitos, tentativa de invasão de contas, manipulação de localização, criação de contas falsas ou qualquer conduta que coloque terceiros em risco.
+## 7. Conduta e medidas de proteção
 
-## 9. Suspensão e encerramento
+Não é permitido usar o MOVI para fraude, ameaça, assédio, discriminação, violência, transporte ilícito, manipulação da localização ou qualquer prática que coloque pessoas em risco. A MOVI pode limitar ou suspender uma conta diante de risco, fraude, exigência legal ou violação destes termos. Quando disponível e compatível com a situação, o passageiro poderá solicitar revisão pelo suporte.
 
-A conta poderá ser temporariamente limitada, suspensa ou encerrada quando houver risco de segurança, fraude, descumprimento destes termos, determinação legal ou regulatória, ou outros fundamentos previstos na política da plataforma. Sempre que cabível, o usuário poderá apresentar contestação pelos canais oficiais.
+## 8. Privacidade
 
-## 10. Proteção de dados
+O tratamento dos dados pessoais está descrito no Aviso de Privacidade e na Política de Segurança e Confiança, consultáveis no aplicativo. O aceite destes Termos não representa consentimento genérico para publicidade ou para finalidades opcionais. Solicitações sobre dados pessoais podem ser encaminhadas a supportmovi@gmail.com.
 
-O tratamento de dados pessoais é disciplinado pelo Aviso de Privacidade do Movi. O Movi adotará medidas técnicas e administrativas de segurança compatíveis com a natureza dos dados e com a legislação aplicável.
+## 9. Atualizações e contato
 
-## 11. Atendimento e reclamações
+Mudanças relevantes serão identificadas por versão e data e poderão exigir novo aceite no aplicativo. O passageiro pode consultar os documentos vigentes no menu da conta e solicitar suporte pelo aplicativo ou pelo e-mail supportmovi@gmail.com.
 
-O usuário poderá utilizar [CANAIS DE SUPORTE]. Reclamações relacionadas à corrida, cobrança, segurança e privacidade deverão conter, quando possível, o identificador da viagem e a descrição do ocorrido.
+Estes Termos são interpretados conforme as normas aplicáveis no Brasil e as regras municipais pertinentes à operação.
 
-## 12. Legislação e regras locais
-
-A atividade de transporte remunerado privado individual está sujeita à legislação federal e às regras do Município ou Distrito Federal onde o serviço é prestado. O uso do aplicativo não dispensa o cumprimento das exigências legais aplicáveis ao usuário ou ao motorista.
-
-## 13. Alterações
-
-A Movi poderá atualizar estes termos para refletir mudanças legais, operacionais ou de segurança. Alterações relevantes serão comunicadas pelos canais apropriados e entrarão em vigor na data informada.
-
-## 14. Contato jurídico
-
-**Responsável:** [PREENCHER]
-**E-mail:** [PREENCHER]
-**Endereço:** [PREENCHER]

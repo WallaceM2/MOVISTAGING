@@ -191,7 +191,33 @@ async function buscarPorId(id) {
   return rows[0];
 }
 
-async function aceitar(corridaId, motoristaId) {
+async function buscarCorridaAtivaMotorista(motoristaId) {
+  const { rows } = await pool.query(`
+    SELECT * FROM corridas
+    WHERE motorista_id = $1 AND status IN ('aceita', 'em_andamento')
+    ORDER BY COALESCE(iniciada_em, aceita_em, criado_em) DESC, id DESC
+    LIMIT 1;
+  `, [motoristaId]);
+  return rows[0] || null;
+}
+
+async function registrarChegadaMotorista(corridaId, motoristaId) {
+  const { rows } = await pool.query(`
+    UPDATE corridas
+    SET motorista_chegou_em = COALESCE(motorista_chegou_em, NOW()), atualizado_em = NOW()
+    WHERE id = $1 AND motorista_id = $2 AND status = 'aceita'
+    RETURNING *;
+  `, [corridaId, motoristaId]);
+  if (rows[0]) return rows[0];
+
+  const current = await buscarPorId(corridaId);
+  if (!current) throw new AppError('Corrida não encontrada.', 404, 'RIDE_NOT_FOUND');
+  if (Number(current.motorista_id) !== Number(motoristaId)) throw new AppError('Esta corrida não pertence a este motorista.', 403, 'RIDE_NOT_ASSIGNED');
+  if (current.status === 'aceita' && current.motorista_chegou_em) return current;
+  throw new AppError('A chegada só pode ser registrada antes do início da corrida.', 409, 'RIDE_ARRIVAL_NOT_ALLOWED');
+}
+
+async function aceitar(corridaId, motoristaId, { viaRadar = false } = {}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -219,12 +245,28 @@ async function aceitar(corridaId, motoristaId) {
     `, [motoristaId, ACTIVE_STATUSES, corridaId]);
     if (activeRide.rows.length) throw new AppError('Motorista já possui outra corrida ativa.', 409, 'DRIVER_ACTIVE_RIDE_EXISTS');
 
-    const oferta = await client.query(`
-      SELECT id FROM corrida_ofertas
-      WHERE corrida_id = $1 AND motorista_id = $2 AND status = 'ofertada' AND expira_em > NOW()
-      FOR UPDATE;
-    `, [corridaId, motoristaId]);
-    if (!oferta.rows[0]) throw new AppError('Esta oferta não está mais disponível para este motorista.', 409, 'RIDE_OFFER_NOT_AVAILABLE');
+    if (viaRadar) {
+      const radar = await client.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM corrida_ofertas
+          WHERE corrida_id = $1 AND status = 'recusada'
+        ) AS possui_recusa,
+        EXISTS (
+          SELECT 1 FROM corrida_ofertas
+          WHERE corrida_id = $1 AND status = 'ofertada' AND expira_em > NOW()
+        ) AS possui_oferta_ativa;
+      `, [corridaId]);
+      if (!radar.rows[0]?.possui_recusa || radar.rows[0]?.possui_oferta_ativa) {
+        throw new AppError('Esta corrida ainda não está disponível no Radar.', 409, 'RIDE_NOT_IN_RADAR');
+      }
+    } else {
+      const oferta = await client.query(`
+        SELECT id FROM corrida_ofertas
+        WHERE corrida_id = $1 AND motorista_id = $2 AND status = 'ofertada' AND expira_em > NOW()
+        FOR UPDATE;
+      `, [corridaId, motoristaId]);
+      if (!oferta.rows[0]) throw new AppError('Esta oferta não está mais disponível para este motorista.', 409, 'RIDE_OFFER_NOT_AVAILABLE');
+    }
 
     const current = await client.query(`
       SELECT motorista_id FROM corridas WHERE id = $1;
@@ -244,6 +286,15 @@ async function aceitar(corridaId, motoristaId) {
           respondida_em = NOW()
       WHERE corrida_id = $2 AND status = 'ofertada';
     `, [motoristaId, corridaId]);
+
+    if (viaRadar) {
+      await client.query(`
+        INSERT INTO corrida_ofertas (corrida_id, motorista_id, status, expira_em, respondida_em)
+        VALUES ($1, $2, 'aceita', NOW(), NOW())
+        ON CONFLICT (corrida_id, motorista_id)
+        DO UPDATE SET status = 'aceita', respondida_em = NOW();
+      `, [corridaId, motoristaId]);
+    }
 
     await client.query('COMMIT');
     return rows[0];
@@ -301,6 +352,29 @@ async function listarOfertasPendentes(motoristaId) {
     ORDER BY o.expira_em ASC
     LIMIT 20;
   `, [motoristaId]);
+  return rows;
+}
+
+async function listarCandidatasRadar() {
+  const { rows } = await pool.query(`
+    SELECT c.id AS corrida_id, c.origem, c.destino, c.origem_lat, c.origem_lng,
+           c.destino_lat, c.destino_lng, c.valor, c.ganho_motorista,
+           c.forma_pagamento, c.categoria, c.distancia_km, c.tempo_minutos,
+           ARRAY(
+             SELECT DISTINCT o.motorista_id FROM corrida_ofertas o
+             WHERE o.corrida_id = c.id AND o.status IN ('recusada','expirada')
+           ) AS motoristas_abordados
+    FROM corridas c
+    WHERE c.status = 'solicitada'
+      AND c.motorista_id IS NULL
+      AND EXISTS (SELECT 1 FROM corrida_ofertas recusada WHERE recusada.corrida_id = c.id AND recusada.status = 'recusada')
+      AND NOT EXISTS (
+        SELECT 1 FROM corrida_ofertas ativa
+        WHERE ativa.corrida_id = c.id AND ativa.status = 'ofertada' AND ativa.expira_em > NOW()
+      )
+    ORDER BY c.criado_em ASC
+    LIMIT 50;
+  `);
   return rows;
 }
 
@@ -827,7 +901,7 @@ async function listarParaUsuario({ tipo, id, limit = 20, offset = 0 }) {
 }
 
 module.exports = {
-  criar, buscarPorId, aceitar, criarOferta, listarOfertasPendentes, buscarOfertaPendente, recusarOferta,
+  criar, buscarPorId, buscarCorridaAtivaMotorista, registrarChegadaMotorista, aceitar, criarOferta, listarOfertasPendentes, listarCandidatasRadar, buscarOfertaPendente, recusarOferta,
   atualizarStatusControlado, iniciarComCodigoEmbarque, finalizarComPagamento, listarParaUsuario, resumoParaUsuario, assertFinancialSnapshot, registrarLedgerCorrida,
   deveBloquearNovaCorrida, deveBloquearCorridasEmDinheiro,
   debitoTaxaCancelamentoDisponivel,

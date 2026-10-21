@@ -16,9 +16,13 @@ const authDriver = [verificarToken, permitirTipo('motorista'), exigirContaAtiva]
 router.post('/estimar', ...authPassenger, validar(corridaSchema), asyncHandler(corridaController.estimar));
 router.post('/solicitar', ...authPassenger, validar(solicitarCorridaSchema), idempotency(), asyncHandler(corridaController.solicitarCorrida));
 router.get('/ofertas', ...authDriver, asyncHandler(corridaController.listarOfertas));
+router.get('/radar', ...authDriver, asyncHandler(corridaController.listarRadar));
+router.get('/ativa', ...authDriver, asyncHandler(corridaController.buscarCorridaAtivaMotorista));
 router.get('/:id', verificarToken, validarParams(idSchema), asyncHandler(corridaController.verCorrida));
 router.post('/:id/recusar', ...authDriver, validarParams(idSchema), idempotency(), asyncHandler(corridaController.recusarCorrida));
 router.post('/:id/aceitar', ...authDriver, validarParams(idSchema), idempotency(), asyncHandler(corridaController.aceitarCorrida));
+router.post('/:id/aceitar-radar', ...authDriver, validarParams(idSchema), idempotency(), asyncHandler(corridaController.aceitarCorridaRadar));
+router.post('/:id/cheguei', ...authDriver, validarParams(idSchema), idempotency(), asyncHandler(corridaController.registrarChegada));
 router.post('/:id/iniciar', ...authDriver, validarParams(idSchema), validar(codigoEmbarqueSchema), idempotency(), asyncHandler(corridaController.iniciarEmbarque));
 router.post('/:id/finalizar', ...authDriver, validarParams(idSchema), validar(finalizacaoSchema), idempotency(), asyncHandler(corridaController.finalizarCorrida));
 router.post('/:id/cancelar', verificarToken, exigirContaAtiva, validarParams(idSchema), idempotency(), asyncHandler(corridaController.cancelarCorrida));

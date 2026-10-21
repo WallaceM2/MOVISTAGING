@@ -19,7 +19,12 @@ test('HTTP smoke: health, not-found e CORS são determinísticos', async (t) => 
   const homeHtml = await home.text();
   assert.match(homeHtml, /MOVI — Sua cidade em movimento/);
   assert.ok(homeHtml.includes('href="movi://"'));
-  assert.ok(homeHtml.includes('href="movi-motorista://"'));
+  assert.ok(homeHtml.includes('data-app-launch="parceiro"'));
+
+  const siteScript = await fetch(`${base}/site.js`);
+  assert.equal(siteScript.status, 200);
+  const siteJs = await siteScript.text();
+  assert.match(siteJs, /parceiro:\s*Object\.freeze\(\{\s*deepLink:\s*'movi-motorista:\/\/'/);
 
   const siteCss = await fetch(`${base}/site.css`);
   assert.equal(siteCss.status, 200);

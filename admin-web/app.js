@@ -1,5 +1,5 @@
-const SESSION_TOKEN = 'movi_admin_access_token';
 const SESSION_ADMIN = 'movi_admin_profile';
+sessionStorage.removeItem('movi_admin_access_token');
 
 const loginView = document.querySelector('#login-view');
 const dashboardView = document.querySelector('#dashboard-view');
@@ -26,16 +26,32 @@ const iconMarkup = {
 
 function svgIcon(name, className = '') {
   const paths = iconMarkup[name] || iconMarkup.incident;
-  return `<svg${className ? ` class="${className}"` : ''} viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+  const parsed = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">' + paths + '</svg>', 'image/svg+xml');
+  const svg = document.importNode(parsed.documentElement, true);
+  if (className) svg.setAttribute('class', className);
+  return svg;
 }
 
 function MoviLogo({ compact = false } = {}) {
-  return `<img src="/admin/assets/movi-logo-oficial.png" alt="" decoding="async">${compact ? '' : '<span class="wordmark">MOVI</span>'}`;
+  const fragment = document.createDocumentFragment();
+  const image = document.createElement('img');
+  image.src = '/admin/assets/movi-logo-oficial.png';
+  image.alt = '';
+  image.decoding = 'async';
+  fragment.append(image);
+  if (!compact) {
+    const wordmark = document.createElement('span');
+    wordmark.className = 'wordmark';
+    wordmark.textContent = 'MOVI';
+    fragment.append(wordmark);
+  }
+  return fragment;
 }
 
 document.querySelectorAll('[data-movi-logo]').forEach((element) => {
-  element.classList.toggle('movi-logo--symbol', element.dataset.moviLogo === 'symbol');
-  element.innerHTML = MoviLogo({ compact: element.dataset.moviLogo === 'symbol' });
+  const compact = element.dataset.moviLogo === 'symbol';
+  element.classList.toggle('movi-logo--symbol', compact);
+  element.replaceChildren(MoviLogo({ compact }));
 });
 
 function showLogin() {
@@ -105,7 +121,7 @@ function addSummaryCard({ icon, label, value, delta, foot }) {
   const graphic = document.createElement('span');
   graphic.className = 'summary-icon';
   graphic.setAttribute('aria-hidden', 'true');
-  graphic.innerHTML = svgIcon(icon);
+  graphic.append(svgIcon(icon));
   const title = document.createElement('span');
   title.className = 'summary-label';
   title.textContent = label;
@@ -148,49 +164,44 @@ function renderChart(series = []) {
   legend.replaceChildren();
   const names = [['Tarifas', 'fares'], ['Comissão MOVI', 'commission'], ['Repasse Motoristas', 'driver']];
   for (const [label, className] of names) {
-    const item = document.createElement('span');
-    item.className = 'legend-item';
-    const dot = document.createElement('i');
-    dot.className = `legend-dot ${className}`;
-    const text = document.createElement('span');
-    text.textContent = label;
-    item.append(dot, text);
-    legend.append(item);
+    const item = document.createElement('span'); item.className = 'legend-item';
+    const dot = document.createElement('i'); dot.className = 'legend-dot ' + className;
+    const text = document.createElement('span'); text.textContent = label;
+    item.append(dot, text); legend.append(item);
   }
-
-  const width = 600;
-  const height = 192;
-  const left = 66;
-  const right = 8;
-  const top = 8;
-  const bottom = 25;
-  const chartWidth = width - left - right;
-  const chartHeight = height - top - bottom;
-  const pointsData = series.length ? series : [{ data: new Date().toISOString(), tarifas: 0, comissao: 0, repasse: 0 }];
-  const maxValue = Math.max(10, ...pointsData.flatMap((item) => [Number(item.tarifas || 0), Number(item.comissao || 0), Number(item.repasse || 0)])) * 1.12;
-  const x = (index) => left + (pointsData.length === 1 ? chartWidth / 2 : (chartWidth * index) / (pointsData.length - 1));
-  const y = (value) => top + chartHeight - (Number(value || 0) / maxValue) * chartHeight;
-  const lines = [];
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNs, 'svg');
+  svg.setAttribute('viewBox', '0 0 600 192'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
+  const node = (tag, attrs, text) => { const element = document.createElementNS(svgNs, tag); for (const [key, value] of Object.entries(attrs || {})) element.setAttribute(key, String(value)); if (text !== undefined) element.textContent = text; return element; };
+  const width = 600, height = 192, left = 66, right = 8, top = 8, bottom = 25;
+  const chartWidth = width - left - right, chartHeight = height - top - bottom;
+  const input = Array.isArray(series) ? series.slice(0, 90) : [];
+  const data = input.length ? input : [{ data: new Date().toISOString(), tarifas: 0, comissao: 0, repasse: 0 }];
+  const metric = (item, key) => { const value = Number(item && item[key]); return Number.isFinite(value) ? Math.max(0, value) : 0; };
+  const maxValue = Math.max(10, ...data.flatMap((item) => ['tarifas', 'comissao', 'repasse'].map((key) => metric(item, key)))) * 1.12;
+  const x = (index) => left + (data.length === 1 ? chartWidth / 2 : chartWidth * index / (data.length - 1));
+  const y = (value) => top + chartHeight - value / maxValue * chartHeight;
   for (let i = 0; i <= 4; i += 1) {
-    const lineY = top + (chartHeight * i) / 4;
-    const labelValue = maxValue * (4 - i) / 4;
-    const formatted = money(labelValue).replace(/,00$/, '');
-    lines.push(`<line class="chart-grid-line" x1="${left}" y1="${lineY}" x2="${width - right}" y2="${lineY}"/><text class="chart-axis-label" x="${left - 8}" y="${lineY + 3}" text-anchor="end">${formatted}</text>`);
+    const lineY = top + chartHeight * i / 4, labelValue = maxValue * (4 - i) / 4;
+    svg.append(node('line', { class: 'chart-grid-line', x1: left, y1: lineY, x2: width - right, y2: lineY }));
+    svg.append(node('text', { class: 'chart-axis-label', x: left - 8, y: lineY + 3, 'text-anchor': 'end' }, money(labelValue).replace(/,00$/, '')));
   }
-  const dateStep = Math.max(1, Math.ceil(pointsData.length / 7));
-  const dateIndices = pointsData.map((_, index) => index).filter((index) => index % dateStep === 0 || index === pointsData.length - 1);
-  const verticalGrid = dateIndices.map((index) => `<line class="chart-grid-line chart-grid-vertical" x1="${x(index)}" y1="${top}" x2="${x(index)}" y2="${top + chartHeight}"/>`).join('');
-  const axisDates = dateIndices.map((index) => `<text class="chart-axis-label" x="${x(index)}" y="${height - 6}" text-anchor="middle">${shortDate(pointsData[index].data)}</text>`).join('');
+  const step = Math.max(1, Math.ceil(data.length / 7));
+  const indices = data.map((_, i) => i).filter((i) => i % step === 0 || i === data.length - 1);
+  for (const i of indices) {
+    svg.append(node('line', { class: 'chart-grid-line chart-grid-vertical', x1: x(i), y1: top, x2: x(i), y2: top + chartHeight }));
+    svg.append(node('text', { class: 'chart-axis-label', x: x(i), y: height - 6, 'text-anchor': 'middle' }, shortDate(data[i] && data[i].data)));
+  }
   const keys = [['tarifas', 'fares'], ['comissao', 'commission'], ['repasse', 'driver']];
-  const paths = keys.map(([key, cls]) => {
-    const points = pointsData.map((item, index) => ({ x: x(index), y: y(item[key]) }));
-    const line = smoothPath(points);
-    const area = `${line} L ${points.at(-1).x} ${top + chartHeight} L ${points[0].x} ${top + chartHeight} Z`;
-    return `<path class="chart-area ${cls}" d="${area}"/><path class="chart-line ${cls}" d="${line}"/>`;
-  }).join('');
-  target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">${lines.join('')}${verticalGrid}${axisDates}${paths}</svg>`;
+  for (const [key, cls] of keys) {
+    const points = data.map((item, i) => ({ x: x(i), y: y(metric(item, key)) }));
+    const line = smoothPath(points), first = points[0], last = points[points.length - 1];
+    const area = line + ' L ' + last.x + ' ' + (top + chartHeight) + ' L ' + first.x + ' ' + (top + chartHeight) + ' Z';
+    svg.append(node('path', { class: 'chart-area ' + cls, d: area }));
+    svg.append(node('path', { class: 'chart-line ' + cls, d: line }));
+  }
+  target.replaceChildren(svg);
 }
-
 const paymentColors = ['#00dfa3', '#00bfe3', '#008ce0', '#82acc9'];
 const paymentLabels = { dinheiro: 'Dinheiro', pix: 'Pix', cartao: 'Cartão', cartao_credito: 'Cartão', cartao_debito: 'Cartão', credito: 'Cartão', debito: 'Cartão' };
 
@@ -308,7 +319,7 @@ function renderActivity(events = []) {
     const [symbol, typeClass] = icons[event.tipo] || ['incident', ''];
     const icon = document.createElement('span');
     icon.className = `activity-icon ${typeClass}`;
-    icon.innerHTML = svgIcon(symbol);
+    icon.append(svgIcon(symbol));
     const copy = document.createElement('div');
     copy.className = 'activity-copy';
     const title = document.createElement('strong');
@@ -353,9 +364,7 @@ function renderDashboard(data) {
 }
 
 async function api(path, options = {}) {
-  const token = sessionStorage.getItem(SESSION_TOKEN);
   const headers = new Headers(options.headers || {});
-  if (token) headers.set('Authorization', `Bearer ${token}`);
   if (options.body) headers.set('Content-Type', 'application/json');
   const response = await fetch(path, { ...options, headers, credentials: 'same-origin', cache: 'no-store' });
   const payload = await response.json().catch(() => ({}));
@@ -382,8 +391,8 @@ async function loadDashboard() {
   } catch (error) {
     loadingState.hidden = true;
     if (error.status === 401 || error.status === 403) {
-      sessionStorage.removeItem(SESSION_TOKEN);
       sessionStorage.removeItem(SESSION_ADMIN);
+      void api('/api/admin/logout', { method: 'POST' }).catch(() => {});
       showLogin();
       loginError.textContent = 'Sua sessão expirou ou não tem acesso administrativo. Entre novamente.';
       loginError.hidden = false;
@@ -413,8 +422,7 @@ loginForm.addEventListener('submit', async (event) => {
       method: 'POST',
       body: JSON.stringify({ email: form.get('email'), senha: form.get('senha') }),
     });
-    if (!result.token || !result.admin) throw new Error('Resposta de autenticação inválida.');
-    sessionStorage.setItem(SESSION_TOKEN, result.token);
+    if (!result.admin) throw new Error('Resposta de autenticação inválida.');
     sessionStorage.setItem(SESSION_ADMIN, JSON.stringify(result.admin));
     loginForm.reset();
     await loadDashboard();
@@ -429,8 +437,8 @@ loginForm.addEventListener('submit', async (event) => {
 document.querySelector('#refresh-button').addEventListener('click', loadDashboard);
 document.querySelector('#period-filter').addEventListener('change', loadDashboard);
 document.querySelector('#global-search').addEventListener('input', (event) => applySearch(event.target.value));
-document.querySelector('#logout-button').addEventListener('click', () => {
-  sessionStorage.removeItem(SESSION_TOKEN);
+document.querySelector('#logout-button').addEventListener('click', async () => {
+  try { await api('/api/admin/logout', { method: 'POST' }); } catch {}
   sessionStorage.removeItem(SESSION_ADMIN);
   pageError.hidden = true;
   loginError.hidden = true;
@@ -464,5 +472,4 @@ document.querySelector('#generate-report').addEventListener('click', () => {
 
 updateClock();
 setInterval(updateClock, 60_000);
-if (sessionStorage.getItem(SESSION_TOKEN)) loadDashboard();
-else showLogin();
+loadDashboard();

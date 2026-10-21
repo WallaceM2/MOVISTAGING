@@ -2,7 +2,7 @@ const pool = require('../config/database');
 const AppError = require('../errors/AppError');
 
 async function criar(dados) {
-  const { corrida_id, avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag, comentario } = dados;
+  const { corrida_id, avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag, tags = [], comentario } = dados;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -25,6 +25,10 @@ async function criar(dados) {
       throw new AppError('Usuário avaliado não participa desta corrida.', 403, 'INVALID_REVIEW_TARGET');
     }
 
+    const tabela = avaliado_tipo === 'motorista' ? 'motoristas' : 'passageiros';
+    const target = await client.query(`SELECT id FROM ${tabela} WHERE id = $1 FOR UPDATE`, [avaliado_id]);
+    if (!target.rows.length) throw new AppError('Usuário avaliado não foi encontrado.', 404, 'REVIEW_TARGET_NOT_FOUND');
+
     const duplicate = await client.query(`
       SELECT id FROM avaliacoes WHERE corrida_id = $1 AND avaliador_id = $2 LIMIT 1;
     `, [corrida_id, avaliador_id]);
@@ -32,20 +36,28 @@ async function criar(dados) {
 
     const insert = await client.query(`
       INSERT INTO avaliacoes
-        (corrida_id, avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag, comentario)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      RETURNING *;
-    `, [corrida_id, avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag || null, comentario || null]);
+        (corrida_id, avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag, tags, comentario)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8::TEXT[],$9)
+      RETURNING id, corrida_id, avaliado_tipo, avaliado_id, nota, tags, criado_em;
+    `, [corrida_id, avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag || tags[0] || null, tags, comentario || null]);
 
-    const tabela = avaliado_tipo === 'motorista' ? 'motoristas' : 'passageiros';
     const media = await client.query(`
       UPDATE ${tabela}
-      SET nota_media = ROUND(((COALESCE(nota_media, 0) * COALESCE(total_avaliacoes, 0)) + $1) / (COALESCE(total_avaliacoes, 0) + 1), 1),
+      SET nota_media = COALESCE((
+            SELECT ROUND(AVG(recent.nota), 1)
+            FROM (
+              SELECT nota
+              FROM avaliacoes
+              WHERE avaliado_tipo = $3 AND avaliado_id = $2
+              ORDER BY criado_em DESC, id DESC
+              LIMIT 100
+            ) recent
+          ), 0),
           total_avaliacoes = COALESCE(total_avaliacoes, 0) + 1,
           atualizado_em = NOW()
       WHERE id = $2
       RETURNING id, nome, nota_media, total_avaliacoes;
-    `, [nota, avaliado_id]);
+    `, [avaliado_id, avaliado_tipo]);
 
     await client.query('COMMIT');
     return { avaliacao: insert.rows[0], avaliado: media.rows[0] };
@@ -60,7 +72,7 @@ async function criar(dados) {
 
 async function listarPorAvaliado(avaliado_tipo, avaliado_id, { limit = 50, offset = 0 } = {}) {
   const { rows } = await pool.query(`
-    SELECT id, corrida_id, avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag, comentario, criado_em
+    SELECT id, corrida_id, nota, tags, criado_em
     FROM avaliacoes
     WHERE avaliado_tipo = $1 AND avaliado_id = $2
     ORDER BY criado_em DESC LIMIT $3 OFFSET $4;

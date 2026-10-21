@@ -116,10 +116,12 @@ test('HTTP suporte: autenticação, isolamento, fila administrativa e retorno ap
   });
 
   const base = `http://127.0.0.1:${server.address().port}/api`;
-  const request = (path, { token, method = 'GET', body } = {}) => fetch(`${base}${path}`, {
+  const request = (path, { token, cookie, origin, method = 'GET', body } = {}) => fetch(`${base}${path}`, {
     method,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(cookie ? { Cookie: cookie } : {}),
+      ...(origin ? { Origin: origin } : {}),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -162,6 +164,19 @@ test('HTTP suporte: autenticação, isolamento, fila administrativa e retorno ap
   const queueResponse = await request('/admin/suporte/chamados?status=aberto&categoria=seguranca', { token: adminToken });
   assert.equal(queueResponse.status, 200);
   assert.equal((await queueResponse.json()).dados.length, 1);
+
+  const cookieQueue = await request('/admin/suporte/chamados?status=aberto', { cookie: `movi_admin_session=${adminToken}` });
+  assert.equal(cookieQueue.status, 200);
+  const csrfDenied = await request(`/admin/suporte/chamados/${ticketId}/mensagens`, {
+    cookie: `movi_admin_session=${adminToken}`, method: 'POST',
+    body: { mensagem: 'Sem Origin não pode alterar.' },
+  });
+  assert.equal(csrfDenied.status, 403);
+  assert.equal((await csrfDenied.json()).codigo, 'CSRF_ORIGIN_DENIED');
+
+  const logout = await request('/admin/logout', { method: 'POST' });
+  assert.equal(logout.status, 204);
+  assert.match(logout.headers.get('set-cookie'), /movi_admin_session=.*HttpOnly.*SameSite=Strict.*Max-Age=0/i);
 
   const adminReply = await request(`/admin/suporte/chamados/${ticketId}/mensagens`, {
     token: adminToken,

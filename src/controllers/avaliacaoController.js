@@ -15,8 +15,11 @@ async function criar(req, res) {
 async function listarPorAvaliado(req, res) {
   const { tipo, id } = req.params;
   if (!['motorista', 'passageiro'].includes(tipo)) throw new AppError('Tipo inválido.', 400, 'INVALID_USER_TYPE');
+  if (req.usuario.tipo !== 'admin' && (req.usuario.tipo !== tipo || Number(req.usuario.id) !== Number(id))) {
+    throw new AppError('Você só pode consultar suas próprias avaliações.', 403, 'FORBIDDEN');
+  }
   const avaliacoes = await Avaliacao.listarPorAvaliado(tipo, id, {
-    ...parsePagination(req.query, { defaultLimit: 50 }),
+    ...parsePagination(req.query, { defaultLimit: 100, maxLimit: 100 }),
   });
   res.json(avaliacoes);
 }

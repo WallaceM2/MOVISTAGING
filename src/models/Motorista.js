@@ -54,6 +54,63 @@ async function buscarPorId(id) {
   return rows[0];
 }
 
+async function buscarDesempenho(id) {
+  const { rows } = await pool.query(`
+    WITH ofertas AS (
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'aceita')::INTEGER AS aceitas,
+        COUNT(*)::INTEGER AS ofertas_consideradas
+      FROM (
+        SELECT status
+        FROM corrida_ofertas
+        WHERE motorista_id = $1
+          AND status IN ('aceita', 'recusada', 'expirada')
+        ORDER BY COALESCE(respondida_em, expira_em) DESC, id DESC
+        LIMIT 100
+      ) AS ofertas_recentes
+    ),
+    viagens AS (
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'concluida')::INTEGER AS concluidas,
+        COUNT(*)::INTEGER AS corridas_consideradas
+      FROM (
+        SELECT status
+        FROM corridas
+        WHERE motorista_id = $1
+          AND (
+            status = 'concluida'
+            OR (
+              status = 'cancelada'
+              AND cancelada_por_tipo = 'motorista'
+              -- A cancellation after the persisted three-minute pickup wait is an operational exception,
+              -- not a failed trip, but remains in corridas for audit/history.
+              AND (
+                motorista_chegou_em IS NULL
+                OR cancelada_em IS NULL
+                OR cancelada_em < motorista_chegou_em + INTERVAL '3 minutes'
+              )
+            )
+          )
+        ORDER BY aceita_em DESC, id DESC
+        LIMIT 100
+      ) AS viagens_recentes
+    )
+    SELECT
+      100::INTEGER AS limite_amostra,
+      ofertas.aceitas,
+      ofertas.ofertas_consideradas,
+      CASE WHEN ofertas.ofertas_consideradas = 0 THEN NULL
+           ELSE ROUND(100.0 * ofertas.aceitas / ofertas.ofertas_consideradas, 1) END AS taxa_aceitacao_pct,
+      viagens.concluidas,
+      viagens.corridas_consideradas,
+      CASE WHEN viagens.corridas_consideradas = 0 THEN NULL
+           ELSE ROUND(100.0 * viagens.concluidas / viagens.corridas_consideradas, 1) END AS taxa_finalizacao_pct,
+      NOW() AS calculado_em
+    FROM ofertas CROSS JOIN viagens;
+  `, [id]);
+  return rows[0];
+}
+
 async function atualizarStatus(id, novoStatus) {
   const cadastroStatus = new Set(['em_analise', 'aprovado', 'reprovado']);
   const contaStatus = new Set(['ativa', 'suspensa', 'banida']);
@@ -190,4 +247,4 @@ async function marcarBloqueioDinheiro(id, bloqueado, saldoCarteira) {
   return rows[0];
 }
 
-module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, atualizarStatus, atualizarVerificacao, atualizarDocumentos, marcarBloqueioDinheiro };
+module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, buscarDesempenho, atualizarStatus, atualizarVerificacao, atualizarDocumentos, marcarBloqueioDinheiro };

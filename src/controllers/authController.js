@@ -4,6 +4,7 @@ const { hashToken } = require('../services/tokenService');
 const AppError = require('../errors/AppError');
 const { sanitizeIp, safeUserAgent } = require('../utils/http');
 const { alterarSenha } = require('../services/authService');
+const passwordRecovery = require('../services/passwordRecoveryService');
 
 async function renovar(req, res) {
   const result = await refresh(req.body?.refresh_token, { ip: sanitizeIp(req), userAgent: safeUserAgent(req) });
@@ -27,4 +28,26 @@ async function trocarSenha(req, res) {
   res.json({ sucesso: true, mensagem: 'Senha alterada com sucesso. Faça login novamente nos seus dispositivos.' });
 }
 
-module.exports = { renovar, logout, trocarSenha };
+async function solicitarRecuperacaoSenha(req, res) {
+  const result = await passwordRecovery.requestCode({
+    tipoUsuario: req.body.tipo_usuario,
+    metodo: req.body.metodo,
+    destino: req.body.destino,
+  });
+  res.status(202).json(result);
+}
+
+async function verificarCodigoRecuperacao(req, res) {
+  res.json(await passwordRecovery.verifyCode({ challengeId: req.body.challenge_id, code: req.body.codigo }));
+}
+
+async function redefinirSenha(req, res) {
+  await passwordRecovery.resetPassword({
+    challengeId: req.body.challenge_id,
+    token: req.body.token_recuperacao,
+    newPassword: req.body.nova_senha,
+  });
+  res.json({ sucesso: true, mensagem: 'Senha redefinida. Entre novamente com a nova senha.' });
+}
+
+module.exports = { renovar, logout, trocarSenha, solicitarRecuperacaoSenha, verificarCodigoRecuperacao, redefinirSenha };

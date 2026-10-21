@@ -46,7 +46,7 @@ function assertAccountCanLogin(tipo, usuario) {
   }
 }
 
-async function autenticarSenha({ tipo, email, senha, buscarPorEmail, ip, userAgent }) {
+async function autenticarSenha({ tipo, email, senha, buscarPorEmail, ip, userAgent, createRefreshSession = true }) {
   const usuario = await buscarPorEmail(email);
   if (!usuario) throw new AppError('Email ou senha inválidos.', 401, 'INVALID_CREDENTIALS');
 
@@ -57,15 +57,19 @@ async function autenticarSenha({ tipo, email, senha, buscarPorEmail, ip, userAge
   await pool.query(`UPDATE ${USER_TABLES[tipo]} SET ultimo_login_em = NOW() WHERE id = $1`, [usuario.id]);
 
   const accessToken = signAccessToken({ id: usuario.id, tipo, jti: crypto.randomUUID() });
-  const refreshToken = createRefreshToken();
-  const sessao = await Sessao.criar({
-    tipo,
-    usuarioId: usuario.id,
-    tokenHash: hashToken(refreshToken),
-    expiraEm: refreshExpiresAt(),
-    ip,
-    userAgent,
-  });
+  let refreshToken = null;
+  let sessao = null;
+  if (createRefreshSession) {
+    refreshToken = createRefreshToken();
+    sessao = await Sessao.criar({
+      tipo,
+      usuarioId: usuario.id,
+      tokenHash: hashToken(refreshToken),
+      expiraEm: refreshExpiresAt(),
+      ip,
+      userAgent,
+    });
+  }
 
   return { usuario, accessToken, refreshToken, sessao };
 }

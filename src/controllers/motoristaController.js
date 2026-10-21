@@ -68,6 +68,7 @@ async function login(req, res) {
 async function perfil(req, res) {
   const motorista = await Motorista.buscarPorId(req.usuario.id);
   if (!motorista) throw new AppError('Motorista não encontrado.', 404, 'DRIVER_NOT_FOUND');
+  motorista.desempenho = await Motorista.buscarDesempenho(req.usuario.id);
   res.json({ motorista });
 }
 

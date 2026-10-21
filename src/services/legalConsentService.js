@@ -7,14 +7,14 @@ const env = require('../config/env');
 
 const DOCUMENTS = Object.freeze({
   passageiro: {
-    termos_uso: { version: process.env.TERMS_PASSENGER_VERSION || '1.0', file: 'TERMOS_DE_USO_PASSAGEIRO.md' },
-    aviso_privacidade: { version: process.env.PRIVACY_VERSION || '1.0', file: 'AVISO_DE_PRIVACIDADE.md' },
-    seguranca_confianca: { version: process.env.SAFETY_POLICY_VERSION || '1.0', file: 'POLITICA_DE_SEGURANCA_E_CONFIANCA.md' },
+    termos_uso: { version: process.env.TERMS_PASSENGER_VERSION || '2.1', file: 'TERMOS_DE_USO_PASSAGEIRO.md' },
+    aviso_privacidade: { version: process.env.PRIVACY_VERSION || '2.1', file: 'AVISO_DE_PRIVACIDADE.md' },
+    seguranca_confianca: { version: process.env.SAFETY_POLICY_VERSION || '2.0', file: 'POLITICA_DE_SEGURANCA_E_CONFIANCA.md' },
   },
   motorista: {
-    termos_uso: { version: process.env.TERMS_DRIVER_VERSION || '1.0', file: 'TERMOS_DO_MOTORISTA_PARCEIRO.md' },
-    aviso_privacidade: { version: process.env.PRIVACY_VERSION || '1.0', file: 'AVISO_DE_PRIVACIDADE.md' },
-    seguranca_confianca: { version: process.env.SAFETY_POLICY_VERSION || '1.0', file: 'POLITICA_DE_SEGURANCA_E_CONFIANCA.md' },
+    termos_uso: { version: process.env.TERMS_DRIVER_VERSION || '2.1', file: 'TERMOS_DO_MOTORISTA_PARCEIRO.md' },
+    aviso_privacidade: { version: process.env.PRIVACY_VERSION || '2.1', file: 'AVISO_DE_PRIVACIDADE.md' },
+    seguranca_confianca: { version: process.env.SAFETY_POLICY_VERSION || '2.0', file: 'POLITICA_DE_SEGURANCA_E_CONFIANCA.md' },
   },
 });
 
@@ -89,3 +89,5 @@ async function possuiTodosAceitesAtuais(usuarioTipo, usuarioId) {
 }
 
 module.exports = { currentRequiredDocuments, registrarAceites, possuiTodosAceitesAtuais };
+
+

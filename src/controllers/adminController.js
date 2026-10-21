@@ -8,13 +8,24 @@ const AppError = require('../errors/AppError');
 const { parsePagination } = require('../utils/pagination');
 const { sanitizeIp, safeUserAgent } = require('../utils/http');
 const { limparPresencaUsuario } = require('../services/dinamicaService');
+const env = require('../config/env');
 
 async function login(req, res) {
-  const { usuario, accessToken, refreshToken } = await autenticarSenha({
+  const { usuario, accessToken } = await autenticarSenha({
     tipo: 'admin', email: req.body.email, senha: req.body.senha, buscarPorEmail: Admin.buscarPorEmail,
-    ip: sanitizeIp(req), userAgent: safeUserAgent(req),
+    ip: sanitizeIp(req), userAgent: safeUserAgent(req), createRefreshSession: false,
   });
-  res.json({ mensagem: 'Login administrativo realizado com sucesso!', token: accessToken, refresh_token: refreshToken, admin: { id: usuario.id, nome: usuario.nome, email: usuario.email } });
+  const secure = env.isProduction ? '; Secure' : '';
+  res.set('Cache-Control', 'no-store');
+  res.set('Set-Cookie', `movi_admin_session=${accessToken}; Path=/api/admin; HttpOnly; SameSite=Strict${secure}`);
+  res.json({ mensagem: 'Login administrativo realizado com sucesso!', admin: { id: usuario.id, nome: usuario.nome, email: usuario.email } });
+}
+
+function logout(req, res) {
+  const secure = env.isProduction ? '; Secure' : '';
+  res.set('Cache-Control', 'no-store');
+  res.set('Set-Cookie', `movi_admin_session=; Path=/api/admin; HttpOnly; SameSite=Strict; Max-Age=0${secure}`);
+  res.status(204).end();
 }
 
 async function listarMotoristas(req, res) {
@@ -250,4 +261,4 @@ async function dashboard(req, res) {
   });
 }
 
-module.exports = { login, listarMotoristas, listarPassageiros, verMotorista, atualizarStatusMotorista, verificarMotorista, verPassageiro, atualizarStatusPassageiro, dashboard };
+module.exports = { login, logout, listarMotoristas, listarPassageiros, verMotorista, atualizarStatusMotorista, verificarMotorista, verPassageiro, atualizarStatusPassageiro, dashboard };

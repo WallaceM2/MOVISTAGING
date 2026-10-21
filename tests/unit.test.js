@@ -13,6 +13,7 @@ const supportKnowledge = require('../src/services/supportKnowledgeService');
 const supportValidators = require('../src/validators/supportValidator');
 const { calculateCashSettlement, calculateCashRideCollection } = require('../src/services/cashSettlement');
 const { calculatePassengerCancellationFee, CANCELLATION_FEE_BRL, CANCELLATION_FEE_DELAY_MS } = require('../src/services/cancellationFee');
+const { avaliacaoSchema } = require('../src/validators/avaliacaoValidator');
 const crypto = require('crypto');
 
 
@@ -41,6 +42,14 @@ test('validação e normalização de CPF', () => {
 test('normalização de email e telefone', () => {
   assert.equal(normalizeEmail('  WALLACE@EXAMPLE.COM '), 'wallace@example.com');
   assert.equal(normalizePhone('(81) 99999-9999'), '81999999999');
+});
+
+test('elogios da avaliação MOVI são estruturados e só aceitos com cinco estrelas para motorista', () => {
+  const base = { corrida_id: 10, avaliado_tipo: 'motorista', avaliado_id: 4, nota: 5 };
+  assert.equal(avaliacaoSchema.safeParse({ ...base, tags: ['atencioso', 'veiculo_limpo'] }).success, true);
+  assert.equal(avaliacaoSchema.safeParse({ ...base, nota: 4, tags: ['atencioso'] }).success, false);
+  assert.equal(avaliacaoSchema.safeParse({ ...base, avaliado_tipo: 'passageiro', tags: ['atencioso'] }).success, false);
+  assert.equal(avaliacaoSchema.safeParse({ ...base, tags: ['elogio_inventado'] }).success, false);
 });
 
 test('máquina de estados de corrida', () => {

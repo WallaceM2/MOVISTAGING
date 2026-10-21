@@ -21,13 +21,29 @@ async function corridaParaPassageiro(corrida) {
   if (!corrida?.motorista_id) return corridaParaPassageiroComCodigo(corrida);
   const result = await pool.query(`
     SELECT m.id, m.nome, m.sobrenome, m.categoria, m.nota_media, m.total_avaliacoes,
-           v.marca, v.modelo, v.cor, v.placa
+           v.marca, v.modelo, v.cor, v.placa,
+           CASE WHEN m.ultima_localizacao_em > NOW() - INTERVAL '2 minutes'
+             THEN m.ultima_lat ELSE NULL END AS ultima_lat,
+           CASE WHEN m.ultima_localizacao_em > NOW() - INTERVAL '2 minutes'
+             THEN m.ultima_lng ELSE NULL END AS ultima_lng,
+           CASE WHEN m.ultima_localizacao_em > NOW() - INTERVAL '2 minutes'
+             THEN m.ultima_localizacao_em ELSE NULL END AS ultima_localizacao_em
     FROM motoristas m
     LEFT JOIN movi_veiculos v ON v.id = m.veiculo_ativo_id AND v.ativo = TRUE AND v.status = 'aprovado'
     WHERE m.id = $1 AND m.status_cadastro = 'aprovado' AND m.status_conta = 'ativa'
     LIMIT 1
   `, [corrida.motorista_id]);
-  return { ...corridaParaPassageiroComCodigo(corrida), motorista: result.rows[0] || null };
+  const driver = result.rows[0] || null;
+  const ride = corridaParaPassageiroComCodigo(corrida);
+  const active = ['aceita', 'em_andamento'].includes(corrida.status);
+  return {
+    ...ride,
+    motorista_chegou_em: corrida.motorista_chegou_em || null,
+    motorista: driver ? { id: driver.id, nome: driver.nome, sobrenome: driver.sobrenome, categoria: driver.categoria, nota_media: driver.nota_media, total_avaliacoes: driver.total_avaliacoes, marca: driver.marca, modelo: driver.modelo, cor: driver.cor, placa: driver.placa } : null,
+    motorista_localizacao: active && driver && driver.ultima_lat != null && driver.ultima_lng != null
+      ? { lat: Number(driver.ultima_lat), lng: Number(driver.ultima_lng), atualizada_em: driver.ultima_localizacao_em }
+      : null,
+  };
 }
 
 async function corridaParaMotorista(corrida) {
@@ -134,6 +150,48 @@ async function listarOfertas(req, res) {
   res.json({ ofertas });
 }
 
+async function listarCorridasRadarDoMotorista(motoristaId, corridaId = null) {
+  if (!(await motoristaDisponivel(motoristaId))) return [];
+  const candidates = await Corrida.listarCandidatasRadar();
+  const selected = corridaId == null ? candidates : candidates.filter((ride) => Number(ride.corrida_id) === Number(corridaId));
+  const radar = [];
+  for (const ride of selected) {
+    const prox = await buscarMotoristasProximos(ride.origem_lat, ride.origem_lng, env.DRIVER_SEARCH_RADIUS_KM, ride.categoria);
+    if (!prox.length) continue;
+    const ids = prox.map((candidate) => candidate.motoristaId);
+    const eligible = await pool.query(`
+      SELECT m.id
+      FROM motoristas m
+      WHERE m.id = ANY($1::integer[])
+        AND m.categoria = $2
+        AND m.status_cadastro = 'aprovado'
+        AND m.status_conta = 'ativa'
+        AND m.online = TRUE AND m.disponivel = TRUE
+        AND m.ultima_atividade_em > NOW() - ($3 * INTERVAL '1 second')
+        AND NOT EXISTS (
+          SELECT 1 FROM corridas ativa
+          WHERE ativa.motorista_id = m.id AND ativa.status = ANY(ARRAY['solicitada','aceita','em_andamento']::text[])
+        )
+        AND ($4::varchar <> 'dinheiro' OR COALESCE(m.bloqueado_dinheiro, FALSE) = FALSE);
+    `, [ids, ride.categoria, env.DRIVER_PRESENCE_TTL_SEC, ride.forma_pagamento]);
+    const eligibleIds = eligible.rows.map((row) => Number(row.id));
+    const approached = new Set((ride.motoristas_abordados || []).map(Number));
+    if (!eligibleIds.length || !eligibleIds.every((id) => approached.has(id)) || !eligibleIds.includes(Number(motoristaId))) continue;
+    const distance = prox.find((candidate) => Number(candidate.motoristaId) === Number(motoristaId))?.distanciaKm;
+    radar.push({ ...ride, motoristas_abordados: undefined, distancia_ate_origem_km: distance });
+  }
+  return radar;
+}
+
+async function listarRadar(req, res) {
+  res.json({ corridas: await listarCorridasRadarDoMotorista(req.usuario.id) });
+}
+
+async function buscarCorridaAtivaMotorista(req, res) {
+  const corrida = await Corrida.buscarCorridaAtivaMotorista(req.usuario.id);
+  res.json({ corrida: corrida ? await corridaParaMotorista(corrida) : null });
+}
+
 async function recusarCorrida(req, res) {
   const oferta = await Corrida.recusarOferta(req.params.id, req.usuario.id);
   if (!oferta) throw new AppError('Esta oferta não está mais disponível.', 409, 'RIDE_OFFER_NOT_AVAILABLE');
@@ -151,11 +209,29 @@ async function aceitarCorrida(req, res) {
   res.json({ mensagem: 'Corrida aceita com sucesso!', corrida: corridaSegura });
 }
 
+async function aceitarCorridaRadar(req, res) {
+  const id = Number(req.params.id);
+  const disponiveis = await listarCorridasRadarDoMotorista(req.usuario.id, id);
+  if (!disponiveis.length) throw new AppError('Esta corrida não está mais disponível no Radar.', 409, 'RIDE_NOT_IN_RADAR');
+  const corrida = await Corrida.aceitar(id, req.usuario.id, { viaRadar: true });
+  await marcarMotoristaDisponivel(req.usuario.id, false);
+  await limparDemandaPassageiro(corrida.passageiro_id);
+  await emitToUser('passageiro', corrida.passageiro_id, 'corrida_aceita', await corridaParaPassageiro(corrida));
+  res.json({ mensagem: 'Corrida do Radar aceita com sucesso!', corrida: await corridaParaMotorista(corrida) });
+}
+
 async function iniciarEmbarque(req, res) {
   const corrida = await Corrida.iniciarComCodigoEmbarque(req.params.id, req.usuario.id, req.body.codigo_embarque);
   await emitToUser('passageiro', corrida.passageiro_id, 'corrida_iniciada', await corridaParaPassageiro(removerCodigoEmbarque(corrida)));
   const corridaSegura = await corridaParaMotorista(corrida);
   res.json({ mensagem: 'Código confirmado. Corrida iniciada.', corrida: corridaSegura });
+}
+
+async function registrarChegada(req, res) {
+  const corrida = await Corrida.registrarChegadaMotorista(req.params.id, req.usuario.id);
+  const passageiroCorrida = await corridaParaPassageiro(corrida);
+  await emitToUser('passageiro', corrida.passageiro_id, 'motorista_chegou', passageiroCorrida);
+  res.json({ mensagem: 'Chegada ao embarque registrada.', corrida: await corridaParaMotorista(corrida) });
 }
 
 async function finalizarCorrida(req, res) {
@@ -207,4 +283,4 @@ async function verCorrida(req, res) {
   res.json(removerCodigoEmbarque(corrida));
 }
 
-module.exports = { estimar, solicitarCorrida, listarOfertas, recusarCorrida, aceitarCorrida, iniciarEmbarque, finalizarCorrida, cancelarCorrida, verCorrida };
+module.exports = { estimar, solicitarCorrida, listarOfertas, listarRadar, buscarCorridaAtivaMotorista, recusarCorrida, aceitarCorrida, aceitarCorridaRadar, registrarChegada, iniciarEmbarque, finalizarCorrida, cancelarCorrida, verCorrida };

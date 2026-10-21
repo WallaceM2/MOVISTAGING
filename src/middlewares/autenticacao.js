@@ -6,12 +6,24 @@ const env = require('../config/env');
 async function verificarToken(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader) throw new AppError('Token não fornecido.', 401, 'AUTH_REQUIRED');
-
-    const [scheme, token, extra] = authHeader.split(' ');
-    if (scheme !== 'Bearer' || !token || extra) {
-      throw new AppError('Formato de token inválido.', 401, 'AUTH_FORMAT');
+    let token;
+    if (authHeader) {
+      const [scheme, bearer, extra] = authHeader.split(' ');
+      if (scheme !== 'Bearer' || !bearer || extra) {
+        throw new AppError('Formato de token inválido.', 401, 'AUTH_FORMAT');
+      }
+      token = bearer;
+    } else if (req.path.startsWith('/admin/')) {
+      const cookieHeader = String(req.headers.cookie || '');
+      if (cookieHeader.length > 8192) throw new AppError('Cookie inválido.', 401, 'AUTH_INVALID');
+      const cookie = cookieHeader.split(';').map((part) => part.trim()).find((part) => part.startsWith('movi_admin_session='));
+      token = cookie?.slice('movi_admin_session='.length);
+      if (token && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        const origin = req.get('origin');
+        if (!origin || !env.CORS_ORIGINS.includes(origin)) throw new AppError('Origem não autorizada para esta operação.', 403, 'CSRF_ORIGIN_DENIED');
+      }
     }
+    if (!token || token.length > 5000) throw new AppError('Token não fornecido.', 401, 'AUTH_REQUIRED');
 
     const decoded = verifyAccessToken(token);
     const id = Number(decoded.sub ?? decoded.id);

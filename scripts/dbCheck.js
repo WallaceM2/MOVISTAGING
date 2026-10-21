@@ -10,6 +10,7 @@ const requiredTables = [
   'movi_push_recibos', 'movi_compartilhamentos_corrida', 'movi_suporte_chamados', 'movi_suporte_mensagens',
   'movi_taxas_cancelamento', 'movi_taxas_cancelamento_recuperacoes',
   'movi_acertos_dinheiro', 'movi_schema_migrations',
+  'movi_chat_corrida_mensagens',
 ];
 
 const requiredColumns = {
@@ -22,6 +23,7 @@ const requiredColumns = {
   ocorrencias_pagamento: ['resposta_passageiro', 'prazo_resposta_em', 'resposta_em', 'contestacao_descricao', 'suporte_chamado_id'],
   movi_taxas_cancelamento: ['corrida_id', 'passageiro_id', 'motorista_id', 'valor', 'aceita_em', 'cancelada_em', 'status', 'repasse_status', 'creditado_carteira_em', 'corrida_reserva_id', 'valor_recuperado', 'recuperado_em'],
   movi_taxas_cancelamento_recuperacoes: ['taxa_cancelamento_id', 'corrida_recuperacao_id', 'passageiro_id', 'motorista_id', 'metodo', 'valor'],
+  movi_chat_corrida_mensagens: ['corrida_id', 'remetente_tipo', 'remetente_id', 'client_message_id', 'tipo', 'mensagem', 'midia_storage_path', 'midia_mime_type', 'midia_tamanho_bytes', 'criado_em'],
 };
 
 async function main() {

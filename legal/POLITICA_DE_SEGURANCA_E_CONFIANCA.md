@@ -1,35 +1,26 @@
-# Política de Segurança e Confiança — Movi
+# Política de Segurança e Confiança — MOVI
 
-Esta política define os controles que o produto pretende oferecer para reduzir riscos antes, durante e depois de uma corrida.
+**Versão:** 2.0 — minuta operacional para revisão
+**Data da minuta:** 19/10/2026
 
-## Identidade e verificação
+Esta política explica recursos e limites da MOVI. Os recursos efetivamente disponíveis dependem da versão do aplicativo e devem ser validados antes de serem anunciados.
 
-- Cadastro individual e autenticação forte.
-- Motorista aprovado somente após análise documental e requisitos da área.
-- Categoria de veículo vinculada ao despacho.
-- Exibição de nome/foto e identificação do veículo antes do embarque, conforme o produto e a legislação.
+## Identidade e conta
 
-## Integridade da corrida
+A MOVI pode solicitar dados e documentos para verificar contas de motoristas e veículos. A aprovação no aplicativo não substitui requisitos legais ou autorização pública. A conta deve ser protegida e não compartilhada.
 
-- Cada corrida possui identificador único.
-- Código de embarque pode ser usado para confirmar que passageiro e motorista estão no vínculo correto.
-- O backend controla estados válidos e quem pode alterá-los.
-- Uma mesma corrida não deve ser aceita por dois motoristas.
-- Um motorista não pode manter duas corridas ativas simultaneamente.
-- Ofertas expiradas devem deixar de ser aceitas.
+## Corridas e localização
 
-## Localização e comunicação
+Cada corrida tem identificador e estados controlados pelo backend. Dados de localização e viagem devem ser compartilhados somente com participantes e prestadores autorizados, pelo tempo necessário à operação, segurança, suporte e obrigações legais. Os recursos de localização dependem das permissões concedidas no dispositivo.
 
-- Localização deve ser transmitida somente pelo usuário autenticado.
-- O sistema utiliza presença com expiração para evitar motoristas fantasmas no radar.
-- A localização de uma corrida é compartilhada apenas com os participantes e sistemas autorizados.
+## Comunicação e incidentes
 
-## Incidentes
+Use os canais de suporte disponíveis no aplicativo para informar incidentes. Em risco imediato, procure os serviços públicos de emergência. Relatos podem exigir análise humana e preservação dos dados estritamente necessários.
 
-Categorias mínimas: acidente, direção perigosa, assédio, agressão, fraude, cobrança indevida, discriminação, perda de objeto, problema documental e outros.
+## Seguro e limites
 
-Incidentes graves devem gerar preservação de evidências, análise de risco, comunicação interna e, quando necessário, acionamento das autoridades e procedimentos legais aplicáveis.
+A MOVI não oferece seguro de vida nem cobertura própria da plataforma para acidentes neste momento. O aplicativo não é serviço de emergência, não elimina riscos de trânsito, não substitui medidas de segurança e não afasta responsabilidades ou direitos previstos em lei. A ausência de cobertura própria não dispensa seguros obrigatórios aplicáveis à operação. Antes de iniciar o serviço em cada município, a MOVI deve confirmar os requisitos regulatórios e cumprir os seguros legalmente exigidos. Eventuais coberturas contratadas serão descritas em documento próprio, sem prometer proteção além da apólice.
 
-## Suporte
+## Atualizações
 
-O aplicativo deve oferecer um canal de suporte acessível, um identificador de corrida e um fluxo de acompanhamento da ocorrência.
+A MOVI poderá revisar esta política para refletir mudanças de produto, operação, legislação e segurança. A versão aplicável será identificada no aplicativo e no site.

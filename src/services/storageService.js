@@ -46,6 +46,29 @@ async function uploadPrivateFile({ buffer, mimetype, tipoUsuario, usuarioId, cam
   return { bucket: env.SUPABASE_STORAGE_BUCKET, path: objectPath, storagePath: `storage://${env.SUPABASE_STORAGE_BUCKET}/${objectPath}` };
 }
 
+async function uploadRideChatMedia({ buffer, mimetype, rideId }) {
+  assertConfigured();
+  const extensionByMime = { 'image/jpeg': '.jpg', 'image/png': '.png', 'audio/mp4': '.m4a' };
+  const extension = extensionByMime[mimetype];
+  if (!extension) throw new AppError('Tipo de mídia de chat não permitido.', 400, 'INVALID_CHAT_MEDIA_TYPE');
+  const objectPath = `chat/corridas/${Number(rideId)}/${crypto.randomUUID()}${extension}`;
+  const url = `${env.SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/${encodePath(env.SUPABASE_STORAGE_BUCKET)}/${encodePath(objectPath)}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      'Content-Type': mimetype,
+      'x-upsert': 'false',
+      'Content-Length': String(buffer.length),
+    },
+    body: buffer,
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new AppError('Não foi possível enviar a mídia do chat.', 502, 'CHAT_MEDIA_UPLOAD_FAILED');
+  return { bucket: env.SUPABASE_STORAGE_BUCKET, path: objectPath, storagePath: `storage://${env.SUPABASE_STORAGE_BUCKET}/${objectPath}` };
+}
+
 async function createSignedUrl(storagePath, expiresIn = 3600) {
   assertConfigured();
   const match = String(storagePath || '').match(/^storage:\/\/([^/]+)\/(.+)$/);
@@ -93,4 +116,4 @@ async function deletePrivateFile(storagePath) {
   return true;
 }
 
-module.exports = { uploadPrivateFile, createSignedUrl, deletePrivateFile };
+module.exports = { uploadPrivateFile, uploadRideChatMedia, createSignedUrl, deletePrivateFile };

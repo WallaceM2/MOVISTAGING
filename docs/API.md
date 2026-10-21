@@ -75,6 +75,10 @@ PATCH /api/admin/passageiros/:id/status
 
 Operações de mutação sensíveis que podem ser repetidas pelo aplicativo usam `Idempotency-Key` quando definido na rota.
 
+`GET /api/avaliacoes/:tipo/:id` é restrito ao próprio usuário autenticado (ou a um administrador), retorna somente nota e elogios estruturados e limita a consulta a 100 itens. A média pública do motorista é recalculada no servidor com as 100 avaliações mais recentes após cada nova avaliação; `total_avaliacoes` continua sendo o total histórico. Elogios MOVI só podem acompanhar avaliações de cinco estrelas para motorista.
+
+`GET /api/motoristas/perfil` inclui `desempenho`, calculado no V3 com até 100 ofertas decididas mais recentes para aceitação e até 100 corridas aceitas com desfecho do motorista para finalização. Oferta aceita conta como aceita; recusa ou expiração contam como não aceitação. Corrida cancelada pelo motorista após aceite conta como não finalizada; cancelamentos do passageiro ou do sistema não penalizam a taxa do motorista. Sem amostra, a taxa é `null`. A amostra usa a quantidade disponível até o limite de 100 e não uma janela de calendário.
+
 `POST /api/corridas/:id/iniciar` exige `codigo_embarque` com 6 caracteres hexadecimais. O servidor limita erros consecutivos e bloqueia novas tentativas temporariamente. O código só é devolvido ao passageiro enquanto a corrida estiver aceita; respostas destinadas ao motorista nunca incluem o código nem os contadores internos. Durante corridas aceitas/em andamento, cada lado recebe somente a identidade pública necessária da outra conta: o motorista vê primeiro nome e reputação do passageiro, e o passageiro vê nome, reputação e veículo aprovado do motorista.
 
 ## Segurança
