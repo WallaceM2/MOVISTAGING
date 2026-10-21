@@ -12,4 +12,16 @@ coverage
 .DS_Store
 *.log
 
-/MOVI-PSG-release.apk
+# Local build and device-capture artifacts
+*.apk
+.jest-cache/
+node-compile-cache/
+avd-*.png
+avd-*.xml
+*-uia.xml
+test-*.png
+window.xml
+
+# Temporary test and export output
+.jest-tmp/
+dist/
