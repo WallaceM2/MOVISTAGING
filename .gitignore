@@ -19,4 +19,10 @@ coverage/
 *.p12
 *.mobileprovision
 
-/MOVI-MTA-release.apk
+# Local build and device-capture artifacts
+*.apk
+avd-*.png
+avd-*.xml
+*-uia.xml
+test-*.png
+window.xml
