@@ -6,7 +6,6 @@ module.exports = ({ config }) => ({
   orientation: 'portrait',
   scheme: 'movi',
   userInterfaceStyle: 'light',
-  newArchEnabled: true,
   ios: {
     ...(config.ios || {}),
     supportsTablet: false,
@@ -19,14 +18,18 @@ module.exports = ({ config }) => ({
   android: {
     ...(config.android || {}),
     package: 'br.com.movi.passageiro',
+    allowBackup: false,
+    blockedPermissions: ['android.permission.SYSTEM_ALERT_WINDOW'],
     ...(process.env.GOOGLE_SERVICES_JSON ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON } : {}),
     permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION', 'POST_NOTIFICATIONS'],
   },
   plugins: [
     'expo-router',
+    'expo-splash-screen',
     ['expo-secure-store', { configureAndroidBackup: true }],
     ['expo-location', { locationWhenInUsePermission: 'O MOVI usa sua localização para mostrar sua posição e calcular sua corrida.' }],
     ['expo-image-picker', { photosPermission: 'O MOVI precisa de acesso às suas fotos para enviar documentos e foto de perfil.' }],
+    ['expo-audio', { microphonePermission: 'O MOVI usa o microfone somente quando você grava uma mensagem de voz no chat da corrida.', recordAudioAndroid: true }],
     ['expo-notifications', { defaultChannel: 'rides' }],
     ...(process.env.MAPBOX_DOWNLOAD_TOKEN ? [['@rnmapbox/maps', { RNMapboxMapsDownloadToken: process.env.MAPBOX_DOWNLOAD_TOKEN }]] : ['@rnmapbox/maps']),
   ],
@@ -35,3 +38,4 @@ module.exports = ({ config }) => ({
     eas: { projectId: '23fb6bb8-348a-4434-b158-ae4559c92f51' },
   },
 });
+

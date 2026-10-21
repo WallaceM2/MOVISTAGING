@@ -6,7 +6,7 @@ import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { createIdempotencyKey } from '@/utils/idempotency';
 import { createSupportTicket, getSupportTicket, listSupportFaq, listSupportTickets, sendSupportMessage, triageSupportQuestion, type SupportCategory, type SupportStatus } from '@/features/suporte/supportService';
-import { colors } from '@/theme/colors';
+import { useMoviTheme, useThemeStyles } from '@/theme/ThemeProvider';
 
 const categories: { id: SupportCategory; label: string }[] = [
   { id: 'corrida', label: 'Corrida' }, { id: 'pagamento', label: 'Pagamento' },
@@ -17,6 +17,8 @@ const statusLabels: Record<SupportStatus, string> = {
 };
 
 export default function SupportScreen() {
+  const colors = useMoviTheme().colors;
+  const styles = useThemeStyles(createStyles);
   const client = useQueryClient();
   const faq = useQuery({ queryKey: ['support-faq'], queryFn: listSupportFaq, staleTime: 300000 });
   const tickets = useQuery({ queryKey: ['support-tickets'], queryFn: listSupportTickets, refetchInterval: 60000, refetchIntervalInBackground: false });
@@ -127,9 +129,9 @@ export default function SupportScreen() {
   </Screen>;
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useMoviTheme>['colors']) { return StyleSheet.create({
   notice: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA', gap: 6 }, noticeTitle: { color: '#9A3412', fontSize: 15, fontWeight: '900' },
   section: { color: colors.text, fontSize: 18, fontWeight: '900', marginTop: 5 }, body: { color: colors.muted, lineHeight: 20 }, input: { minHeight: 50, borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, color: colors.text, backgroundColor: colors.surface }, multiline: { minHeight: 110, textAlignVertical: 'top' },
   answer: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', gap: 8 }, answerLabel: { color: '#166534', fontSize: 11, fontWeight: '900' }, helper: { color: colors.muted, fontSize: 12, lineHeight: 18 }, faq: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }, faqTitle: { color: colors.text, fontSize: 14, fontWeight: '800', flex: 1 }, faqOpen: { color: colors.success, fontSize: 12, fontWeight: '800' },
   rowTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, link: { color: colors.success, fontWeight: '900' }, form: { gap: 12 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 99, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.surface }, chipSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, chipText: { color: colors.text, fontSize: 12, fontWeight: '700' }, chipTextSelected: { color: colors.white }, ticket: { gap: 7 }, status: { color: colors.success, fontSize: 11, fontWeight: '900' }, message: { backgroundColor: '#F3F4F6', borderRadius: 14, padding: 12, gap: 5 }, userMessage: { backgroundColor: '#ECFDF5' }, messageAuthor: { color: colors.text, fontSize: 11, fontWeight: '900' }, error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
-});
+}); }

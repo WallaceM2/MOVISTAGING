@@ -7,9 +7,10 @@ import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { getProfile } from '@/features/perfil/profileService';
 import { getPassengerDocumentUrl, uploadPassengerDocuments, type PassengerDocumentType } from '@/features/documentos/documentosService';
-import { colors } from '@/theme/colors';
+import { useMoviTheme, useThemeStyles } from '@/theme/ThemeProvider';
 
 export default function DocumentsScreen() {
+  const styles = useThemeStyles(createStyles);
   const profile = useQuery({ queryKey: ['profile'], queryFn: getProfile });
   const [loading, setLoading] = useState<PassengerDocumentType | null>(null);
   const [viewerLoading, setViewerLoading] = useState<PassengerDocumentType | null>(null);
@@ -42,15 +43,15 @@ export default function DocumentsScreen() {
 
   if (profile.isLoading) return <Screen title="Documentos" loading />;
   return <Screen title="Meus documentos" subtitle="Os arquivos são enviados ao armazenamento privado do MOVI.">
-    <DocumentRow label="RG" present={Boolean(passenger?.rg)} document="rg" loading={loading} viewerLoading={viewerLoading} onUpload={pick} onView={view} />
-    <DocumentRow label="CNH" present={Boolean(passenger?.cnh)} document="cnh" loading={loading} viewerLoading={viewerLoading} onUpload={pick} onView={view} />
-    <DocumentRow label="Foto de perfil" present={Boolean(passenger?.foto_perfil_url)} document="foto_perfil" loading={loading} viewerLoading={viewerLoading} onUpload={pick} onView={view} />
-    <Card><Text style={styles.note}>O backend V3 aceita RG, CNH e foto de perfil para passageiro. O app nunca armazena uma chave privada do Supabase.</Text></Card>
+    <DocumentRow styles={styles} label="RG" present={Boolean(passenger?.rg)} document="rg" loading={loading} viewerLoading={viewerLoading} onUpload={pick} onView={view} />
+    <DocumentRow styles={styles} label="CNH" present={Boolean(passenger?.cnh)} document="cnh" loading={loading} viewerLoading={viewerLoading} onUpload={pick} onView={view} />
+    <DocumentRow styles={styles} label="Foto de perfil" present={Boolean(passenger?.foto_perfil_url)} document="foto_perfil" loading={loading} viewerLoading={viewerLoading} onUpload={pick} onView={view} />
   </Screen>;
 }
 
-function DocumentRow({ label, present, document, loading, viewerLoading, onUpload, onView }: { label: string; present: boolean; document: PassengerDocumentType; loading: PassengerDocumentType | null; viewerLoading: PassengerDocumentType | null; onUpload: (document: PassengerDocumentType) => void; onView: (document: PassengerDocumentType) => void }) {
+function DocumentRow({ label, present, document, loading, viewerLoading, onUpload, onView, styles }: { label: string; present: boolean; document: PassengerDocumentType; loading: PassengerDocumentType | null; viewerLoading: PassengerDocumentType | null; onUpload: (document: PassengerDocumentType) => void; onView: (document: PassengerDocumentType) => void; styles: ReturnType<typeof createStyles> }) {
   return <Card><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.title}>{label}</Text><Text style={styles.status}>{present ? 'Documento cadastrado' : 'Ainda não enviado'}</Text></View><Button title={present ? 'Atualizar' : 'Enviar'} compact onPress={() => onUpload(document)} loading={loading === document} /></View>{present ? <Button title="Gerar acesso temporário" variant="secondary" compact onPress={() => onView(document)} loading={viewerLoading === document} /> : null}</Card>;
 }
 
-const styles = StyleSheet.create({ row: { flexDirection: 'row', gap: 12, alignItems: 'center' }, title: { fontSize: 17, fontWeight: '900', color: colors.text }, status: { color: colors.muted, marginTop: 5 }, note: { color: colors.muted, lineHeight: 19, fontSize: 13 } });
+function createStyles(colors: ReturnType<typeof useMoviTheme>['colors']) { return StyleSheet.create({ row: { flexDirection: 'row', gap: 12, alignItems: 'center' }, title: { fontSize: 17, fontWeight: '900', color: colors.text }, status: { color: colors.muted, marginTop: 5 } }); }
+

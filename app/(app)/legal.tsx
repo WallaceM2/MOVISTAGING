@@ -7,9 +7,11 @@ import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { getPublicLegal, acceptLegal } from '@/features/legal/legalService';
 import { useAuthStore } from '@/store/authStore';
-import { colors } from '@/theme/colors';
+import { useMoviTheme, useThemeStyles } from '@/theme/ThemeProvider';
 
+function formatLegalContent(content: string) { return content.replace(/^#{1,6}\s*/gm, '').replace(/\*\*(.*?)\*\*/g, (match, inner) => inner).replace(/^\s*[-*]\s+/gm, '• ').replace(/\n{3,}/g, '\n\n').trim(); }
 export default function LegalAcceptanceScreen() {
+  const styles = useThemeStyles(createStyles);
   const query = useQuery({ queryKey: ['public-legal', 'passageiro'], queryFn: getPublicLegal });
   const [loading, setLoading] = useState(false);
   async function submit() {
@@ -26,9 +28,12 @@ export default function LegalAcceptanceScreen() {
   return <Screen title="Atualização dos documentos legais" subtitle="Para continuar usando recursos da conta, confirme os documentos vigentes.">
     {query.isLoading ? <Text>Carregando documentos…</Text> : null}
     {query.isError ? <Button title="Tentar novamente" onPress={() => void query.refetch()} /> : null}
-    {query.data?.documentos.map((doc) => <Card key={`${doc.documentoTipo}-${doc.versao}`}><Text style={styles.title}>{doc.titulo ?? doc.documentoTipo}</Text><Text style={styles.version}>Versão {doc.versao}</Text><Text style={styles.content}>{doc.conteudo}</Text></Card>)}
+    {query.data?.documentos.map((doc) => <Card key={`${doc.documentoTipo}-${doc.versao}`}><Text style={styles.title}>{doc.titulo ?? doc.documentoTipo}</Text><Text style={styles.version}>Versão {doc.versao}</Text><Text style={styles.content}>{formatLegalContent(doc.conteudo ?? '')}</Text></Card>)}
     <Button title="Li e aceito os documentos vigentes" onPress={() => void submit()} loading={loading} disabled={!query.data?.documentos.length} />
   </Screen>;
 }
 
-const styles = StyleSheet.create({ title: { fontSize: 18, fontWeight: '900', color: colors.text }, version: { color: colors.muted, marginTop: 4 }, content: { color: colors.text, lineHeight: 21, marginTop: 12, fontSize: 13 } });
+function createStyles(colors: ReturnType<typeof useMoviTheme>['colors']) { return StyleSheet.create({ title: { fontSize: 18, fontWeight: '900', color: colors.text }, version: { color: colors.muted, marginTop: 4 }, content: { color: colors.text, lineHeight: 21, marginTop: 12, fontSize: 13 } }); }
+
+
+

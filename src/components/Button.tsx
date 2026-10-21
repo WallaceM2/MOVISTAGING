@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, radius } from '@/theme/colors';
+import { useMoviTheme } from '@/theme/ThemeProvider';
 
 type Props = {
   title: string;
@@ -12,8 +13,9 @@ type Props = {
 };
 
 export function Button({ title, onPress, disabled = false, loading = false, variant = 'primary', compact = false }: Props) {
-  const backgroundColor = variant === 'danger' ? colors.danger : variant === 'secondary' ? colors.primarySoft : colors.primary;
-  const textColor = variant === 'secondary' ? colors.text : colors.white;
+  const theme = useMoviTheme().colors;
+  const backgroundColor = variant === 'danger' ? colors.danger : variant === 'secondary' ? theme.primarySoft : theme.primary;
+  const textColor = variant === 'secondary' ? theme.text : '#04120F';
   const isDisabled = disabled || loading;
 
   return (

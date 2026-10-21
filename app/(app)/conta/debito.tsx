@@ -6,7 +6,7 @@ import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { contestCancellationFee, getCashDebts, respondToCashDebt, type CashDebt } from '@/features/perfil/debtService';
 import { brl } from '@/utils/format';
-import { colors } from '@/theme/colors';
+import { useMoviTheme, useThemeStyles } from '@/theme/ThemeProvider';
 
 function date(value: string | null | undefined) {
   if (!value) return 'Não informado';
@@ -19,6 +19,8 @@ function statusLabel(status: CashDebt['resposta_passageiro']) {
 }
 
 export default function DebtScreen() {
+  const colors = useMoviTheme().colors;
+  const styles = useThemeStyles(createStyles);
   const client = useQueryClient();
   const debtQuery = useQuery({ queryKey: ['cash-debts'], queryFn: getCashDebts });
   const [drafts, setDrafts] = useState<Record<number, string>>({});
@@ -98,6 +100,6 @@ export default function DebtScreen() {
   </Screen>;
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useMoviTheme>['colors']) { return StyleSheet.create({
   label: { color: colors.muted, fontSize: 13 }, total: { fontSize: 34, fontWeight: '900', color: colors.text, marginVertical: 8 }, ok: { color: colors.success, fontWeight: '800' }, note: { color: colors.muted, lineHeight: 20, marginTop: 8 }, warning: { color: colors.danger, fontWeight: '800', lineHeight: 20 }, rideTitle: { color: colors.text, fontSize: 19, fontWeight: '900' }, route: { color: colors.text, lineHeight: 20, marginTop: 6 }, meta: { color: colors.muted, fontSize: 12, marginTop: 6 }, divider: { borderBottomWidth: 1, borderColor: colors.border, marginVertical: 12 }, row: { color: colors.muted, marginVertical: 3 }, amount: { color: colors.text, fontWeight: '800' }, debtAmount: { color: colors.danger, fontWeight: '900', marginTop: 8 }, response: { color: colors.text, fontWeight: '800', marginTop: 12 }, input: { minHeight: 100, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.bg, padding: 12, marginTop: 12, textAlignVertical: 'top', color: colors.text }, buttonWrap: { marginTop: 10, minHeight: 44 },
-});
+}); }

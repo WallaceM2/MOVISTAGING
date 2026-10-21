@@ -95,6 +95,8 @@ export type Ride = {
   status: RideStatus;
   status_pagamento: string;
   codigo_embarque?: string;
+  motorista_chegou_em?: string | null;
+  motorista_localizacao?: { lat: number; lng: number; atualizada_em: string } | null;
   motorista?: {
     id: number;
     nome: string;
@@ -140,7 +142,8 @@ export type ExtratoResponse = {
   pagina: { limit: number; offset: number };
 };
 
-export type EvaluationInput = { corrida_id: number; avaliado_tipo: 'motorista' | 'passageiro'; avaliado_id: number; nota: number; tag?: string; comentario?: string };
+export type DriverCompliment = 'atencioso' | 'veiculo_limpo' | 'boa_rota' | 'atendimento_excelente' | 'viagem_confortavel' | 'direcao_segura';
+export type EvaluationInput = { corrida_id: number; avaliado_tipo: 'motorista' | 'passageiro'; avaliado_id: number; nota: number; tag?: string; tags?: DriverCompliment[]; comentario?: string };
 export type ReportInput = { corrida_id: number; denunciado_id: number; motivo: 'direcao_perigosa' | 'assedio' | 'agressao' | 'roubo' | 'fraude' | 'outro'; descricao?: string };
 
 export type ApiErrorShape = {erro?: string;mensagem?: string;codigo?: string;request_id?: string;detalhes?: {campo?: string;mensagem?: string;}[];};
@@ -148,8 +151,10 @@ export type ApiErrorShape = {erro?: string;mensagem?: string;codigo?: string;req
 export type SocketEventPayload = {
   corrida_solicitada: { corrida_id: number; status: RideStatus; oferta_enviada: boolean };
   corrida_aceita: Ride;
+  motorista_chegou: Ride;
   corrida_iniciada: Ride;
   corrida_finalizada: { mensagem: string; corrida: Ride; financeiro?: Record<string, unknown> };
   corrida_cancelada: { corrida_id: number; corrida: Ride };
   motorista_em_movimento: { corrida_id: number; lat: number; lng: number; direcao: number };
+  chat_nova_mensagem: { corrida_id: number; mensagem: import('@/features/chat/chatService').RideChatMessage };
 };

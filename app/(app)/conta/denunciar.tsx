@@ -6,7 +6,7 @@ import { Input } from '@/components/Input';
 import { Screen } from '@/components/Screen';
 import { createReport } from '@/features/denuncia/denunciaService';
 import type { ReportInput } from '@/types/api';
-import { colors } from '@/theme/colors';
+import { useMoviTheme, useThemeStyles } from '@/theme/ThemeProvider';
 
 const reasons: { value: ReportInput['motivo']; label: string }[] = [
   { value: 'direcao_perigosa', label: 'Direção perigosa' },
@@ -18,6 +18,7 @@ const reasons: { value: ReportInput['motivo']; label: string }[] = [
 ];
 
 export default function ReportScreen() {
+  const styles = useThemeStyles(createStyles);
   const { id, motoristaId } = useLocalSearchParams<{ id: string; motoristaId?: string }>();
   const [reason, setReason] = useState<ReportInput['motivo']>('outro');
   const [description, setDescription] = useState('');
@@ -39,4 +40,4 @@ export default function ReportScreen() {
     <Text style={styles.note}>Em casos graves, procure também os serviços públicos de emergência adequados à situação.</Text>
   </Screen>;
 }
-const styles = StyleSheet.create({ option: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, backgroundColor: colors.surface }, selected: { borderColor: colors.text, backgroundColor: colors.primarySoft }, optionText: { color: colors.text, fontWeight: '700' }, description: { minHeight: 140, textAlignVertical: 'top', paddingTop: 14 }, note: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' } });
+function createStyles(colors: ReturnType<typeof useMoviTheme>['colors']) { return StyleSheet.create({ option: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, backgroundColor: colors.surface }, selected: { borderColor: colors.text, backgroundColor: colors.primarySoft }, optionText: { color: colors.text, fontWeight: '700' }, description: { minHeight: 140, textAlignVertical: 'top', paddingTop: 14 }, note: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' } }); }

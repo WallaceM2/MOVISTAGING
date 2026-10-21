@@ -11,3 +11,5 @@ ios
 coverage
 .DS_Store
 *.log
+
+/MOVI-PSG-release.apk

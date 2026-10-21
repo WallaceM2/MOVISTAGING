@@ -1,14 +1,16 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { colors, radius } from '@/theme/colors';
+import { useMoviTheme } from '@/theme/ThemeProvider';
 
 type Props = TextInputProps & { label: string; error?: string };
 
 export function Input({ label, error, ...props }: Props) {
+  const theme = useMoviTheme().colors;
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput {...props} placeholderTextColor="#9CA3AF" style={[styles.input, error && styles.error]} />
+      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
+      <TextInput {...props} placeholderTextColor={theme.muted} selectionColor={theme.primary} style={[styles.input, { borderColor: theme.border, backgroundColor: theme.surface, color: theme.text }, error && styles.error]} />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
