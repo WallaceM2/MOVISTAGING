@@ -6,3 +6,12 @@ uploads/
 *.log
 .DS_Store
 coverage/
+
+# Local build and device-capture artifacts
+node-compile-cache/
+*.apk
+avd-*.png
+avd-*.xml
+*-uia.xml
+test-*.png
+window.xml
