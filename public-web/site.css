@@ -177,7 +177,9 @@ h1 em, h2 em { color: var(--green); font-style: normal; }
 .footer-brand span { font-size: 16px; }
 .footer-inner > span { color: #a3b5bb; font-size: var(--font-meta); }
 .footer-inner > small { margin-left: auto; color: #98adb4; font-size: var(--font-meta); }
-.footer-note { margin: 15px auto 0; color: #637b85; font-size: 9px; line-height: 1.5; }
+.footer-note { margin: 15px auto 0; color: #9aafb6; font-size: 11px; line-height: 1.55; }
+.footer-operator { margin: 12px auto 0; color: #b2c4c9; font-size: 12px; line-height: 1.6; }
+.footer-operator a { color: #65e8c1; text-underline-offset: 3px; }
 
 @media (max-width: 980px) {
   .page-wrap { width: min(calc(100% - 44px), var(--width)); }
@@ -245,7 +247,7 @@ h1 em, h2 em { color: var(--green); font-style: normal; }
   .footer-inner { flex-wrap: wrap; gap: 10px 15px; }
   .footer-inner > span { font-size: 9px; }
   .footer-inner > small { width: 100%; margin-left: 0; }
-  .footer-note { margin-top: 12px; font-size: 8px; }
+  .footer-note { margin-top: 12px; font-size: 11px; }
 }
 @media (max-width: 390px) {
   .hero-actions { display: grid; align-items: stretch; }
@@ -427,7 +429,7 @@ h1 em, h2 em { color: var(--green); font-style: normal; }
   .footer-inner { display: grid; grid-template-columns: 1fr; gap: 13px; }
   .footer-inner > nav { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; }
   .footer-inner > small { width: auto; }
-  .footer-note { font-size: 8px; }
+  .footer-note { font-size: 11px; }
 }
 @media (max-width: 390px) {
   .hero-actions { display: grid; align-items: stretch; }
@@ -551,4 +553,23 @@ h1 em, h2 em { color: var(--green); font-style: normal; }
   .legal-controls select { width: 100%; }
   .legal-content-card { padding: 15px; }
   .legal-document { font-size: var(--font-meta); }
+}
+
+.triage-form .support-data-note, .triage-form .privacy-acknowledgement { display: block; margin: 0 0 12px; color: #b5c6cb; font-size: .8125rem; line-height: 1.55; }
+.triage-form .support-data-note a { color: #65e8c1; text-underline-offset: 3px; }
+.triage-form .privacy-acknowledgement { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; }
+.triage-form .privacy-acknowledgement input { width: 18px; height: 18px; flex: 0 0 18px; margin: 1px 0 0; accent-color: var(--green); }
+
+.cookie-policy { max-width: 860px; color: var(--text); }
+.cookie-policy h1 { margin: 0 0 24px; font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing: -.04em; }
+.cookie-policy h2 { margin: 34px 0 12px; font-size: 1.25rem; }
+.cookie-policy p, .cookie-policy li { color: #c1d0d4; font-size: 1rem; line-height: 1.75; }
+.cookie-policy ul { padding-left: 1.25rem; }
+.cookie-policy a:not(.button) { color: #65e8c1; text-underline-offset: 3px; }
+.cookie-navigation { display: flex; }
+@media (max-width: 720px) {
+  .cookie-navigation { position: static; display: flex; flex-wrap: wrap; gap: 10px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+  .cookie-navigation > a { min-height: 40px; padding: 0 4px; font-size: .75rem; }
+  .cookie-policy { padding-block: 64px; }
+  .footer-operator { font-size: 11px; }
 }

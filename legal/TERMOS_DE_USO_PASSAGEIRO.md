@@ -1,14 +1,14 @@
 # Termos de Uso e Serviços — MOVI Passageiro
 
-**Versão:** 2.1  
-**Atualizado em:** 19/10/2026  
+**Versão:** 2.2
+**Atualizado em:** 22/10/2026
 **Operador da plataforma:** Demilly R. M. Mendes, pessoa física — CPF ***.***.***-13  
 **Endereço para contato:** Rua Bela Vista, nº 155, Xique-Xique, Caruaru/PE, CEP 55103-000  
 **Atendimento e privacidade:** supportmovi@gmail.com
 
 ## 1. Sobre o MOVI
 
-O MOVI é uma plataforma digital de mobilidade urbana que licencia e disponibiliza aplicativos para conectar passageiros a motoristas parceiros independentes. O passageiro solicita uma viagem pelo app; o motorista decide se aceita e, ao aceitar, realiza o transporte.
+O MOVI licencia e disponibiliza aplicativos e recursos digitais para intermediar solicitações de viagens entre passageiros e motoristas parceiros. O passageiro pode enviar um pedido pelo app; cada motorista decide se o aceita e, se aceitar, realiza materialmente o transporte.
 
 A MOVI não conduz o veículo nem executa diretamente o transporte. O funcionamento depende de disponibilidade de motoristas, conexão, localização, recursos habilitados e regras aplicáveis à cidade.
 
@@ -42,7 +42,7 @@ O motorista pode cancelar quando as condições operacionais apresentadas no app
 
 O MOVI é um aplicativo de mobilidade urbana, não um serviço de emergência e não oferece seguro de vida nem cobertura securitária própria da plataforma como benefício incluído na corrida. O app pode exibir recursos de segurança que estejam realmente habilitados; eles não substituem os serviços públicos de emergência.
 
-O motorista parceiro é responsável pela condução, pelo veículo, pela execução material do transporte e por verificar e cumprir os requisitos legais e securitários aplicáveis à sua atividade e localidade. A MOVI não oferece seguro patrimonial para o veículo do parceiro nem promete indenização por roubo, furto, colisão ou outros danos. A ausência de comprovante de seguro no cadastro não altera exigências que sejam aplicáveis à operação.
+O motorista parceiro responde pela condução, pelas condições e pelo uso do veículo e pela execução material do transporte aceito. Cabe a ele verificar e cumprir as exigências legais aplicáveis à atividade e à localidade em que atua, inclusive contratar e manter vigente apólice de seguro quando exigida pela legislação ou pela autoridade competente e apresentar comprovante quando solicitado. A MOVI não exige o envio desse comprovante como etapa própria de cadastro. A MOVI não oferece seguro patrimonial para o veículo do parceiro, seguro de vida nem cobertura securitária própria da plataforma incluída na corrida, e não promete indenização por roubo, furto, colisão ou outros danos. Essa informação não elimina direitos do passageiro nem deveres que a lei atribua a qualquer participante; eventuais ocorrências devem ser avaliadas conforme os fatos e as normas aplicáveis.
 
 Em situação de risco imediato, procure os serviços públicos de emergência. Para dúvidas, reclamações ou contestação de uma corrida, use o suporte no aplicativo ou escreva para supportmovi@gmail.com.
 

@@ -1,14 +1,14 @@
-# Termos de Uso e Licença — MOVI Drive / Motorista Parceiro
+# Termos de Uso e Licença do MOVI Drive — Motorista Parceiro
 
-**Versão:** 2.1  
-**Atualizado em:** 19/10/2026  
+**Versão:** 2.2
+**Atualizado em:** 22/10/2026
 **Operador da plataforma:** Demilly R. M. Mendes, pessoa física — CPF ***.***.***-13  
 **Endereço para contato:** Rua Bela Vista, nº 155, Xique-Xique, Caruaru/PE, CEP 55103-000  
 **Atendimento e privacidade:** supportmovi@gmail.com
 
 ## 1. Objeto e funcionamento
 
-A MOVI licencia o uso do MOVI Drive e oferece uma plataforma digital que intermedeia solicitações de viagens entre passageiros e motoristas parceiros. O parceiro decide se fica disponível e se aceita cada solicitação. Ao aceitar, realiza materialmente o transporte solicitado, observadas as informações e os fluxos disponíveis no aplicativo.
+A MOVI concede ao parceiro uma licença pessoal e não exclusiva para usar o MOVI Drive conforme estes Termos. O aplicativo oferece recursos tecnológicos para receber, organizar e encaminhar solicitações de viagem e informar o andamento dos pedidos, aproximando passageiros e motoristas parceiros. A MOVI não é proprietária nem operadora dos veículos cadastrados e não realiza materialmente o transporte. O parceiro decide quando fica disponível e se aceita cada solicitação; ao aceitá-la, fica responsável pela execução concreta da viagem, pela condução e pelo veículo, conforme as condições apresentadas no app e as regras aplicáveis.
 
 O acesso à plataforma não substitui habilitação, registro, autorização, licença, cadastro público ou outro requisito aplicável à atividade e à localidade.
 
@@ -34,9 +34,9 @@ Saldo de carteira não significa, por si só, transferência bancária concluíd
 
 A MOVI não oferece seguro patrimonial para o veículo do parceiro nem seguro de vida ou cobertura securitária própria da plataforma como benefício incluído no uso do app. Roubo, furto, colisão, incêndio ou outros danos ao veículo não geram cobertura ou reembolso pela MOVI.
 
-O parceiro responde pela execução material do transporte aceito, pela condução e pelo estado e uso do veículo, por seus atos e omissões e por verificar, contratar, manter vigente e pagar os seguros e encargos securitários que forem exigidos para sua atividade e localidade. Quando autoridades ou terceiros puderem exigir comprovantes, cabe ao parceiro apresentá-los. A MOVI não coleta comprovante de seguro como requisito de cadastro ou acesso ao app, e essa política não dispensa obrigações aplicáveis.
+O parceiro responde pela execução material do transporte aceito, pela condução, pelas condições e pelo uso do veículo, bem como por seus próprios atos e omissões. Antes de atuar, deve verificar quais exigências se aplicam à sua atividade e localidade e, quando a legislação ou a autoridade competente exigir seguro, contratar e manter vigente a apólice correspondente e apresentar o comprovante quando solicitado. A MOVI não exige o envio desse comprovante como etapa própria de cadastro no aplicativo; isso não dispensa o parceiro de cumprir uma exigência aplicável.
 
-Cada parte responde por seus próprios atos e pelas obrigações que lhe forem atribuídas. A apuração de incidentes considera os fatos concretos e as regras aplicáveis.
+A MOVI não oferece seguro patrimonial para o veículo do parceiro, seguro de vida ou cobertura securitária própria da plataforma incluída no uso do app. A falta de cobertura oferecida pela MOVI não altera obrigações securitárias que sejam aplicáveis ao parceiro. Cada parte responde pelos próprios atos e pelos deveres que lhe sejam atribuídos pelas normas aplicáveis. A análise de um incidente depende das circunstâncias concretas e não é substituída por uma declaração genérica nestes Termos.
 
 ## 6. Segurança e dados
 

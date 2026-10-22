@@ -33,10 +33,11 @@ if (menuButton && navigation) {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || menuButton.getAttribute('aria-expanded') !== 'true') return;
     menuButton.setAttribute('aria-expanded', 'false');
     menuButton.setAttribute('aria-label', 'Abrir navegação');
     navigation.classList.remove('is-open');
+    menuButton.focus();
   });
 }
 

@@ -427,11 +427,11 @@ const env = Object.freeze({
   // Documentos legais
   TERMS_PASSENGER_VERSION:
     process.env.TERMS_PASSENGER_VERSION ||
-    '2.1',
+    '2.2',
 
   TERMS_DRIVER_VERSION:
     process.env.TERMS_DRIVER_VERSION ||
-    '2.1',
+    '2.2',
 
   PRIVACY_VERSION:
     process.env.PRIVACY_VERSION ||
